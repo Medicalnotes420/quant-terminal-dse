@@ -2,6 +2,7 @@
 // Formulas follow the Pine Script reference (ta.* functions) so values line up with
 // TradingView's built-ins: RMA-based RSI/ATR/ADX, SMA-seeded EMA, population stdev.
 // Every series is a plain array the same length as the bars; missing values are NaN.
+import { detect as detectPatterns } from "./chartpatterns.js";
 
 const N = NaN;
 const isNum = (v) => typeof v === "number" && !Number.isNaN(v);
@@ -2475,6 +2476,19 @@ export const INDICATORS = [
     calc: (bars, p) => ({
       volumeProfile: { rows: p.rows, width: p.width, valueArea: p.valueArea },
     }),
+  },
+  {
+    id: "chartpatterns",
+    name: "All Chart Patterns",
+    group: "Trend",
+    overlay: true,
+    inputs: [
+      { key: "patterns", label: "Patterns", type: "select", options: ["All", "Awaiting and Reached", "Only Awaiting", "Last Awaiting"], default: "All" },
+      { key: "targets", label: "Price Targets", type: "select", options: ["All", "Only Awaiting", "Awaiting and Reached", "None"], default: "All" },
+      { key: "inProgress", label: "In Progress", type: "select", options: ["Off", "On"], default: "Off" },
+    ],
+    outputs: [],
+    calc: (bars, p) => ({ chartPatterns: detectPatterns(bars, { patterns: p.patterns, targets: p.targets, inProgress: p.inProgress === "On" }) }),
   },
   {
     id: "svp",

@@ -539,6 +539,7 @@ const REF = {
   markov: null, // checked in the Markov regime test below
   avwap: null, // checked in the anchored VWAP test below
   svp: null, // drawn by the chart, checked in the session volume profile test below
+  chartpatterns: null, // drawn by the chart, checked in test/chartpatterns.test.js
   pdhl: () => ({
     // Daily bars, period = day: each bar shows the bar before it.
     high: bars.map((b, i) => (i ? bars[i - 1].high : NaN)),

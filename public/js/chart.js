@@ -14,6 +14,7 @@ import {
 } from "../lib/series.js";
 import { DrawingLayer, TOOL_BY_ID } from "./drawings.js";
 import { VolumeProfile, SessionVolumeProfile } from "./volume-profile.js";
+import { ChartPatterns } from "./chart-patterns.js";
 
 const LW = window.LightweightCharts;
 
@@ -652,6 +653,15 @@ export class ChartPane {
         const vp = new VolumeProfile(this, res.volumeProfile);
         this.main.attachPrimitive(vp);
         this.vpPrims.push(vp);
+      }
+      if (res.chartPatterns) {
+        // bar-index patterns only make sense on real bars: Renko, Kagi, Line break, Range, Point & figure and Heikin Ashi are rebuilt
+        if (["renko", "linebreak", "range", "kagi", "pnf", "heikin"].includes(this.cfg.type)) res.error = "Not drawn on this chart type: use candles, bars or a line";
+        else {
+          const cp = new ChartPatterns(this, res.chartPatterns);
+          this.main.attachPrimitive(cp);
+          this.vpPrims.push(cp);
+        }
       }
       if (res.sessionProfile) {
         const sp = new SessionVolumeProfile(this, res.sessionProfile);
