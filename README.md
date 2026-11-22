@@ -149,17 +149,7 @@ python3 examples/python/quant_terminal.py
 cd examples/rust && cargo run --release
 ```
 
-Add `--listen` to either one to print alerts as they fire. Trading real money happens in PTQ (below).
-
-## Works with PTQ
-
-If you run PTQ on the same computer (`ptq serve`), Quant Terminal finds it automatically:
-
-- **Check with PTQ** appears under every strategy tester result. It sends the rules to PTQ, which backtests them on its own engine and checks whether the result was luck: walk-forward, overfitting (PBO), deflated Sharpe and higher costs. The strategy is saved in your PTQ.
-- **The PTQ tab** shows your PTQ account, positions, armed strategies and recent orders, with a button that stops all PTQ trading.
-- **Trading it** happens in PTQ. Connect your account in PTQ, then arm the strategy on the command line (`ptq arm-strategy <id> --max-notional 100`). PTQ shows what you're agreeing to before anything trades.
-
-Quant Terminal never sees your PTQ licence key or your exchange keys, never places an order and never arms a strategy. It can only make PTQ do less: engage its stop, or disarm a strategy. It reads the lease `ptq activate` saved on this computer and talks to PTQ on `127.0.0.1:8787` (set `PTQ_URL` to change that). PTQ's builder takes SMA, EMA, RSI, ATR, ROC, standard deviation, Bollinger Bands, MACD, Donchian highs and lows and volume; anything else is refused with the reason rather than approximated.
+Add `--listen` to either one to print alerts as they fire.
 
 ## Commands
 
@@ -170,7 +160,6 @@ Quant Terminal never sees your PTQ licence key or your exchange keys, never plac
 | `npm run doctor` | Check Node and which data sources you can reach |
 | `npm test` | Offline tests (indicators, backtester, server) |
 | `npm run smoke` | Start the server and check it serves live data |
-| `PTQ_URL=http://127.0.0.1:8787 npm start` | Point the PTQ connector somewhere else |
 | `npm run compare -- BTCUSDT 1D 2026-10-10` | Print indicator values for one bar, to check against another charting tool |
 
 `PORT=4000 npm start` picks a port. `HOST=0.0.0.0 npm start` lets a phone on your home network open it (only do that on a network you trust).
