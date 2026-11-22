@@ -844,8 +844,6 @@ export class ChartPane {
         /\(([^)]+)\)$/.exec(def.name)?.[1].split(" / ")[0] || def.name;
       html += `<div class="row ind" data-uid="${ind.uid}" style="${ind.hidden ? "opacity:.45" : ""}"><span class="name">${esc(short)} ${esc(params)}</span><span class="vals">${vals}</span><span class="acts"><button data-act="settings" title="Settings">${ICON.gear}</button><button data-act="hide" title="Show/hide">${ICON.eye}</button><button data-act="remove" title="Remove">${ICON.x}</button></span></div>`;
     }
-    for (const note of this.notes || [])
-      html += `<div class="row note">${esc(note)}</div>`;
     this.legendEl.innerHTML = html;
     this.legendEl.onclick = (e) => {
       const btn = e.target.closest("[data-act]");

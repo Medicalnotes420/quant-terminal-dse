@@ -139,14 +139,19 @@
           <div class="tab-body" id="bottomBody"></div>
         </div>
       </section>
+      <div class="side-resizer" id="sideResizer" role="separator" aria-orientation="vertical" aria-label="Resize the side panel" tabindex="0" title="Drag to resize, double-click to reset"></div>
+      <button id="sideOpen" class="side-open" title="Show the side panel" aria-label="Show the side panel"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></svg></button>
       <aside class="side">
         <div class="tabs" id="sideTabs">
           <button data-tab="watchlist" class="active">Favorites</button>
           <button data-tab="shares">All shares</button>
           <button data-tab="details">Details</button>
           <button data-tab="alerts">Alerts</button>
+          <div class="spacer"></div>
+          <button id="sideToggle" class="icon" title="Minimize the side panel" aria-label="Minimize the side panel"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg></button>
         </div>
         <div class="tab-body" id="sideBody"></div>
+        <div class="side-notes" id="sideNotes" aria-live="polite"></div>
       </aside>
     </div>
 

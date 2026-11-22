@@ -30,6 +30,7 @@ const PA_ICON = {
   max: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
   restore: '<svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>',
 };
+const SIDE_MIN = 220, SIDE_MAX = 640;
 const isDse = (s) => /^(DSE|CSV):/.test(String(s));
 
 class App {
@@ -64,6 +65,8 @@ class App {
       ],
       watchlists: DEFAULT_WATCHLISTS,
       savedLayouts: {},
+      sideWidth: 300,
+      sideCollapsed: false,
       activeWatchlist: "Main",
       drawings: {},
       settings: {},
@@ -91,6 +94,7 @@ class App {
     this.buildToolbar();
     this.buildDrawbar();
     this.setLayout(this.state.layout, false);
+    this.bindSidePanel();
     this.panels = initPanels(this);
     this.bindKeys();
     this.listenAlerts();
@@ -216,6 +220,52 @@ class App {
     if (save) this.persist();
   }
 
+  // ---------- the side panel (Favorites, All shares, Details, Alerts): drag its edge to resize, minimize to a tab ----------
+  applySide() {
+    const w = Math.max(SIDE_MIN, Math.min(SIDE_MAX, Number(this.state.sideWidth) || 300));
+    this.state.sideWidth = w;
+    document.querySelector(".side").style.width = `${w}px`;
+    $(".main").classList.toggle("side-collapsed", !!this.state.sideCollapsed);
+    $("#sideResizer").setAttribute("aria-valuenow", String(w));
+  }
+  bindSidePanel() {
+    const set = (w, save = true) => {
+      this.state.sideWidth = w;
+      this.applySide();
+      if (save) this.persist();
+    };
+    const collapse = (on) => {
+      this.state.sideCollapsed = on;
+      this.applySide();
+      this.persist();
+    };
+    $("#sideToggle").onclick = () => collapse(true);
+    $("#sideOpen").onclick = () => collapse(false);
+    const bar = $("#sideResizer");
+    bar.onpointerdown = (e) => {
+      e.preventDefault();
+      bar.setPointerCapture(e.pointerId);
+      bar.classList.add("dragging");
+      const right = $(".main").getBoundingClientRect().right;
+      bar.onpointermove = (m) => set(right - m.clientX, false); // the panel's left edge follows the pointer
+    };
+    bar.onpointerup = (e) => {
+      bar.releasePointerCapture(e.pointerId);
+      bar.onpointermove = null;
+      bar.classList.remove("dragging");
+      this.persist();
+    };
+    bar.ondblclick = () => set(300);
+    bar.onkeydown = (e) => {
+      const step = e.shiftKey ? 60 : 20;
+      if (e.key === "ArrowLeft") set(this.state.sideWidth + step);
+      else if (e.key === "ArrowRight") set(this.state.sideWidth - step);
+      else return;
+      e.preventDefault();
+    };
+    this.applySide();
+  }
+
   // ---------- saved layouts: the chart arrangement, each chart's symbol, timeframe and indicators ----------
   snapshotLayout() {
     return { layout: this.state.layout, panes: this.panes.map((p) => structuredClone(p.cfg)), savedAt: Date.now() };
@@ -309,14 +359,24 @@ class App {
     this.active = pane;
     pane.el.classList.add("active");
     this.syncToolbar();
+    this.updateNotes();
     this.panels?.onActiveChange?.();
   }
 
   onPaneLoaded(pane) {
     if (pane === this.active) {
       this.syncToolbar();
+      this.updateNotes();
       this.panels?.onActiveChange?.();
     }
+  }
+
+  // What the data says about itself (where the bars came from, the last day, a live bar): the foot of the side panel,
+  // for the chart that is active, so it never covers the candles.
+  updateNotes() {
+    const box = $("#sideNotes");
+    if (!box) return;
+    box.innerHTML = (this.active?.notes || []).map((n) => `<p>${esc(n)}</p>`).join("");
   }
 
   // ---------- toolbar ----------

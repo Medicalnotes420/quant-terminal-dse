@@ -1044,3 +1044,21 @@ table.t.heat td { text-align: center; } table.t.heat td.base { outline: 2px soli
 .legend .note { color: #ffc24d; font-size: 11.5px; background: color-mix(in srgb, var(--bg) 82%, transparent); border-radius: 4px; padding: 1px 6px; margin-top: 2px; width: fit-content; }
 .legend .row .name, .legend .ind .vals { font-weight: 500; }
 .ptb-name { text-shadow: 0 0 3px var(--bg), 0 0 3px var(--bg); font-weight: 600; }
+
+/* side panel: drag the edge to resize, minimize to a tab on the right edge */
+.main { position: relative; }
+.side { min-width: 0; }
+.side-resizer { flex: none; width: 6px; margin: 0 -3px 0 -3px; z-index: 6; cursor: col-resize; background: transparent; touch-action: none; }
+.side-resizer:hover, .side-resizer:focus-visible, .side-resizer.dragging { background: var(--accent-soft); outline: none; }
+.side-open { display: none; position: absolute; right: 0; top: 56px; z-index: 7; width: 22px; height: 44px; border: 1px solid var(--border); border-right: 0; border-radius: 6px 0 0 6px; background: var(--panel); color: var(--muted); cursor: pointer; padding: 0; place-items: center; }
+.side-open:hover { color: var(--text); background: var(--hover); }
+.side-open svg, #sideToggle svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.main.side-collapsed .side, .main.side-collapsed .side-resizer { display: none; }
+.main.side-collapsed .side-open { display: inline-grid; }
+@media (max-width: 900px) { .side-resizer, .side-open { display: none !important; } }
+
+/* data notes at the foot of the side panel */
+.side-notes { flex: none; max-height: 34%; overflow: auto; border-top: 1px solid var(--border); padding: 6px 10px; font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+.side-notes:empty { display: none; }
+.side-notes p { margin: 0 0 5px; }
+.side-notes p:last-child { margin-bottom: 0; }
