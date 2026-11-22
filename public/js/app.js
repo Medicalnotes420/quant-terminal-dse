@@ -15,16 +15,16 @@ const TF_QUICK = ["1m", "5m", "15m", "1h", "4h", "1D", "1W"];
 const LAYOUTS = { 1: 1, "2v": 2, "2h": 2, 3: 3, 4: 4, 6: 6, 8: 8, 16: 16 };
 const DEFAULT_WATCHLISTS = {
   Main: [
-    "BINANCE:BTCUSDT",
-    "BINANCE:ETHUSDT",
-    "BINANCE:SOLUSDT",
-    "US:AAPL",
-    "US:NVDA",
-    "US:SPY",
-    "US:QQQ",
-    "FX:EURUSD",
+    "DSE:DSEX",
+    "DSE:DS30",
+    "DSE:AL-HAJTEX",
+    "DSE:ORIONINFU",
+    "DSE:SONALIANSH",
+    "DSE:WATACHEM",
   ],
 };
+// Only DSE shares and your own CSV files are served, so anything else saved earlier is dropped on load.
+const isDse = (s) => /^(DSE|CSV):/.test(String(s));
 
 class App {
   constructor() {
@@ -47,7 +47,7 @@ class App {
       layout: "1",
       panes: [
         {
-          symbol: "BINANCE:BTCUSDT",
+          symbol: "DSE:DSEX",
           tf: "1D",
           type: "candles",
           indicators: [
@@ -74,6 +74,11 @@ class App {
       ...this.state.settings,
     };
     this.state.settings = this.settings;
+    for (const p of this.state.panes) if (!isDse(p.symbol)) p.symbol = "DSE:DSEX";
+    for (const [name, list] of Object.entries(this.state.watchlists)) {
+      const kept = list.filter(isDse);
+      this.state.watchlists[name] = kept.length ? kept : [...DEFAULT_WATCHLISTS.Main];
+    }
     document.documentElement.dataset.theme = this.settings.theme;
     await this.loadCustomIndicators();
     this.buildToolbar();
@@ -397,7 +402,7 @@ class App {
   openSymbolSearch(initial = "", onPick = null, title = "Symbol search") {
     const card = this.modal(
       title,
-      `<input class="search-in" id="symQ" placeholder="BTC, AAPL, EURUSD, ^FTSE, VOD.L…" autocomplete="off" value="${esc(initial)}"><div class="list" id="symList"></div><div class="hint-text" style="margin-top:8px">Crypto: Binance (falls back to Coinbase and Kraken). US stocks and ETFs: Nasdaq. Forex: Kraken. Global indices, futures and non-US stocks use Yahoo symbols (YAHOO:^FTSE, YAHOO:GC=F) when Yahoo is reachable.</div>`,
+      `<input class="search-in" id="symQ" placeholder="DSEX, AL-HAJTEX, ORIONINFU…" autocomplete="off" value="${esc(initial)}"><div class="list" id="symList"></div><div class="hint-text" style="margin-top:8px">Dhaka Stock Exchange shares and indexes (DSEX, DS30), from your day-end files, and your own CSV files.</div>`,
     );
     const q = card.querySelector("#symQ"),
       list = card.querySelector("#symList");

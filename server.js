@@ -259,6 +259,8 @@ async function handle(req, res) {
           (q.symbols || "").split(",").filter(Boolean).slice(0, 200),
         ),
       );
+    if (data.DSE_ONLY && /^\/api\/(calendar|earnings|dividends|news|financials|screener)$/.test(p))
+      throw httpError(404, "Only DSE data is enabled, so this US and crypto feature is off.");
     if (p === "/api/calendar")
       return send(res, 200, await data.economicCalendar());
     if (p === "/api/earnings") return send(res, 200, await info.earnings(Number(q.days) || 5));
