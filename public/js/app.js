@@ -371,6 +371,11 @@ class App {
     }
   }
 
+  // the chart's patterns changed (a redraw, a selection, a switch): keep the Patterns tab in step
+  onPatterns(pane) {
+    if (pane === this.active) this.panels?.onPatterns?.();
+  }
+
   // What the data says about itself (where the bars came from, the last day, a live bar): the foot of the side panel,
   // for the chart that is active, so it never covers the candles.
   updateNotes() {
@@ -383,7 +388,7 @@ class App {
   buildToolbar() {
     const tfBox = $("#tfButtons");
     tfBox.innerHTML = TF_QUICK.map(
-      (t) => `<button data-tf="${t}">${t}</button>`,
+      (t, k) => `<button data-tf="${t}" title="${t}  (Alt+${k + 1}; Alt+[ and Alt+] step through)">${t}</button>`,
     ).join("");
     tfBox.onclick = (e) => {
       const tf = e.target.dataset.tf;
@@ -832,6 +837,7 @@ class App {
       if (e.key === "Escape") {
         if (!$("#modal").classList.contains("hidden")) return this.closeModal();
         if (this.tool !== "cursor") return this.setTool("cursor");
+        if (this.active?.selectedPattern) return this.active.selectPattern(null);
         const full = this.panes.find((p) => p.el.classList.contains("max"));
         if (full) return this.paneAction(full, "maxchart");
         if (this.active?.drawings.selected) {
@@ -839,6 +845,21 @@ class App {
           this.active.drawings.update();
         }
         return;
+      }
+      // Alt+1..4 pick 1h, 1D, 1W, 1M in the toolbar's order; Alt+[ and Alt+] step back and forward through them.
+      // (Plain letters are taken: typing starts a symbol search.)
+      if (e.altKey && !typing && !e.ctrlKey && !e.metaKey && this.active) {
+        const digit = /^Digit([1-9])$/.exec(e.code)?.[1];
+        let tf = digit ? TF_QUICK[Number(digit) - 1] : null;
+        if (e.code === "BracketLeft" || e.code === "BracketRight") {
+          const at = TF_QUICK.indexOf(this.active.cfg.tf);
+          if (at >= 0) tf = TF_QUICK[(at + (e.code === "BracketRight" ? 1 : -1) + TF_QUICK.length) % TF_QUICK.length];
+        }
+        if (tf) {
+          e.preventDefault();
+          this.setTf(tf);
+          return;
+        }
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
       if (

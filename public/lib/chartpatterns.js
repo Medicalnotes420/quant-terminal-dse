@@ -218,7 +218,7 @@ const DOWN = [headShoulders, tripleTop, doubleTop, invertedCup, bearFlag, rising
 // ---------- what happens to a pattern after it forms ----------
 // Awaiting: no target yet. Reached: the target was touched after a close beyond the boundary. Failed: a close beyond
 // the pattern's extreme before that. Breakouts and targets use the bars after the last pivot.
-function settle(raw, bars) {
+function settleInner(raw, bars) {
   const out = { status: "Awaiting", breakI: null, dir: raw.dir, target: null };
   const from = raw.pivots.at(-1).i + 1;
   for (let i = from; i < bars.length; i++) {
@@ -236,6 +236,18 @@ function settle(raw, bars) {
     if (bull ? bars[i].high >= out.target : bars[i].low <= out.target) { out.status = "Reached"; out.reachI = i; return out; }
     if (raw.dir !== "either" && c > raw.invalid) { out.status = "Failed"; out.failI = i; return out; }
   }
+  return out;
+}
+
+// settleInner plus the two prices a trader asks about: where the pattern broke (entry) and where it is wrong (stop).
+// The stop is the pattern's far extreme, or for a wedge, flag or pennant the opposite line; a triangle or rectangle
+// has none until it breaks, then the opposite side.
+function settle(raw, bars) {
+  const out = settleInner(raw, bars);
+  const at = out.breakI ?? bars.length - 1;
+  out.entry = out.level ?? null;
+  if (raw.dir === "either") out.stopPrice = out.breakI == null ? null : out.dir === "bull" ? raw.lower(out.breakI) : raw.upper(out.breakI);
+  else out.stopPrice = raw.stop ? raw.stop(at) : raw.invalid;
   return out;
 }
 
@@ -277,7 +289,8 @@ function unflip(p) {
   return {
     ...p, type: FLIP[p.type] || p.type, pivots: p.pivots.map(neg), shape: p.shape.map(neg),
     lines: p.lines.map((l) => ({ ...l, a: neg(l.a), b: neg(l.b) })),
-    s: { ...p.s, dir: p.s.dir === "bear" ? "bull" : p.s.dir, target: p.s.target == null ? null : -p.s.target },
+    s: { ...p.s, dir: p.s.dir === "bear" ? "bull" : p.s.dir, target: p.s.target == null ? null : -p.s.target,
+      entry: p.s.entry == null ? null : -p.s.entry, stopPrice: p.s.stopPrice == null ? null : -p.s.stopPrice },
   };
 }
 
@@ -319,6 +332,7 @@ export function detect(bars, opts = {}, config = CONFIG) {
     const s = p.s, end = s.reachI ?? s.failI ?? s.breakI ?? p.pivots.at(-1).i;
     return {
       type: p.type, dir: s.dir, status: s.status, points: p.shape.map(pt), lines: p.lines, breakI: s.breakI, formedAt: p.formedAt, inProgress: p.inProgress,
+      entry: s.entry ?? null, stop: s.stopPrice ?? null,
       target: s.target == null ? null : { price: s.target, fromI: s.breakI, toI: Math.min(n - 1, Math.max(end, s.breakI) + 10) },
     };
   }).sort((a, b) => a.points[0].i - b.points[0].i);

@@ -17,7 +17,7 @@ fs.writeFileSync(path.join(dir, "dayend_ABC_x.csv"), H + [
   "2026-11-01,ABC,10,11,9,10.5,5,1,100", "2026-11-02,ABC,10.5,12,10,11,5,1,100", "2026-11-03,ABC,11,11,11,11,0,0,0",
 ].join("\n"));
 fs.writeFileSync(path.join(dir, "dayend_stocknow_y.csv"), H + [
-  "2026-11-02,ABC,10.5,12,10,99,5,1,100", "2026-11-04,ABC,11,13,10.8,12,5,1,100", "2026-11-04,XYZ,5,6,4,5.5,2,1,50",
+  "2026-11-02,ABC,10.5,12,10,99,5,1,100", "2026-11-04,ABC,11,13,10.8,12,5,1,100", "2026-11-04,XYZ,5,6,4,5.5,2,1,50", "2026-11-04,LIVE,20,21,19,20,5,1,100",
 ].join("\n"));
 fs.writeFileSync(path.join(dir, "market_summary_z.csv"), "date,dsex,ds30,total_volume\n2026-11-01,5000,2000,10\n2026-11-02,5100,2050,20\n");
 // 25 shares that each close 100, 102, 101.02 on 2 to 4 Nov: median returns +2% and -0.98%. DSEX is missing on 3 and 4 Nov.
@@ -29,13 +29,28 @@ fs.writeFileSync(path.join(dir, "dayend_stocknow_bulk.csv"), H + bulk.join("\n")
 import http from "node:http";
 const T0 = Date.UTC(2026, 10, 1, 4) / 1000;
 let hourlyHits = 0;
+const TODAY = Date.UTC(2026, 10, 8, 4) / 1000; // 8 Nov 2026, 10:00 in Dhaka
 const stocknow = http.createServer((req, res) => {
   hourlyHits++;
+  if (req.url.includes("/LIVE/")) {
+    // three hourly bars of today: 10:00, 11:00, 12:00
+    const t = [0, 1, 2].map((k) => TODAY + k * 3600);
+    return res.end(JSON.stringify([[20.5, 21, 21.5], [21.5, 22, 22.8], [20.1, 20.9, 21.2], [21, 21.6, 22.4], [1000, 2000, 3000], t]));
+  }
   if (req.url.startsWith("/GONE/")) { res.writeHead(404); return res.end("no"); }
   const t = [0, 1, 2, 3, 4, 5].map((k) => T0 + k * 3600);
   res.end(JSON.stringify([[10, 11, 12, 13, 14, 0], [11, 12, 13, 14, 15, 0], [9, 10, 11, 12, 13, 0], [10.5, 11.5, 12.5, 13.5, 14.5, 0], [100, 200, 300, 400, 500, 600], t]));
 });
 await new Promise((r) => stocknow.listen(0, "127.0.0.1", r));
+// the Worker: it knows one share, LIVE, and answers 404 for any other, so the other tests see no live bar
+let workerHits = 0;
+const worker = http.createServer((req, res) => {
+  workerHits++;
+  if (!req.url.includes("code=LIVE")) { res.writeHead(404); return res.end("{}"); }
+  res.end(JSON.stringify({ ltp: 22.6, ycp: 20, high: 22.9, low: 20.0, fetchedAt: "2026-11-08T06:30:00Z" })); // 12:30 in Dhaka
+});
+await new Promise((r) => worker.listen(0, "127.0.0.1", r));
+process.env.QT_DSE_WORKER = `http://127.0.0.1:${worker.address().port}`;
 process.env.QT_STOCKNOW_URL = `http://127.0.0.1:${stocknow.address().port}/api`;
 const dse = await import("../lib/dse.js");
 
@@ -75,7 +90,8 @@ test("an unknown code is a 404 that names it", async () => {
 
 test("tickers lists indices then shares, and the CSV export has one row per bar", () => {
   const t = dse.tickers();
-  assert.deepEqual([t.slice(0, 3), t.at(-1), t.length], [["DSEX", "DS30", "ABC"], "XYZ", 2 + 1 + 25 + 1]);
+  // the shares are ABC, the 25 bulk ones, XYZ and LIVE (the share the live-bar tests use)
+  assert.deepEqual([t.slice(0, 3), t.at(-1), t.length], [["DSEX", "DS30", "ABC"], "XYZ", 2 + 1 + 25 + 1 + 1]);
   assert.equal(dse.csvOf("ABC").trim().split("\n").length, 4);
 });
 
@@ -138,3 +154,30 @@ test("parseHourly refuses a reply that is not the six columns", () => {
 });
 
 test.after(() => stocknow.close());
+
+test("today's bar: the Worker's latest price, with open, high, low and volume from StockNow's hourly bars", async () => {
+  const r = await dse.candles("LIVE", "1D", 100);
+  const day = r.candles.at(-1);
+  assert.equal(new Date(day.time * 1000).toISOString().slice(0, 10), "2026-11-08");
+  assert.equal(day.close, 22.6, "the Worker's price");
+  assert.equal(day.open, 20.5, "the first hourly bar's open, not yesterday's close");
+  assert.equal(day.high, 22.9, "the higher of the Worker's high and the hours' highs");
+  assert.equal(day.low, 20.0);
+  assert.equal(day.volume, 6000, "1000 + 2000 + 3000");
+  assert.match(r.notes.join(" "), /session so far/);
+});
+
+test("the Worker is asked at most once every 8 seconds per share", async () => {
+  await dse.candles("LIVE", "1D", 100);
+  const before = workerHits;
+  for (let k = 0; k < 5; k++) await dse.candles("LIVE", "1D", 100);
+  assert.equal(workerHits, before, "five more charts, no more Worker requests");
+});
+
+test("a share the Worker does not know simply has no live bar", async () => {
+  const r = await dse.candles("ABC", "1D", 100);
+  assert.deepEqual(r.candles.map((b) => b.close), [10.5, 11, 12]);
+  assert.ok(!/session so far|live price/.test(r.notes.join(" ")));
+});
+
+test.after(() => worker.close());

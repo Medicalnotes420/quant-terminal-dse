@@ -1,7 +1,8 @@
 // One chart: candles + volume + any number of indicators, drawings, compare symbols, replay and live data.
-import { api, fmtPrice, fmtPct, esc, ticker, exchange } from "./api.js";
+import { api, fmtPrice, fmtPct, fmtNum, esc, ticker, exchange } from "./api.js";
 import { BY_ID, compute, periodKey } from "../lib/indicators.js";
 import { reorder, withoutGroup, groupOf } from "../lib/panes.js";
+import { isSessionOpen, pollDelayMs } from "../lib/session.js";
 import {
   parseTf,
   isIntraday,
@@ -14,7 +15,7 @@ import {
 } from "../lib/series.js";
 import { DrawingLayer, TOOL_BY_ID } from "./drawings.js";
 import { VolumeProfile, SessionVolumeProfile } from "./volume-profile.js";
-import { ChartPatterns } from "./chart-patterns.js";
+import { ChartPatterns, patternColour } from "./chart-patterns.js";
 
 const LW = window.LightweightCharts;
 
@@ -148,12 +149,17 @@ export class ChartPane {
     this.extraMarkers = [];
     this.replay = null;
     this.paneGroups = []; // uids of the indicators in each lower pane, set while drawing
+    this.patternList = []; // every pattern the All Chart Patterns indicator found, with a key, hidden ones included
+    this.patternPrim = null;
+    this.patternInd = null; // the indicator that produced them
+    this.selectedPattern = null; // a key
     this.maxUid = null; // the lower pane (by its first indicator) that fills the chart, or null
     el.innerHTML =
-      '<div class="chart"></div><div class="legend"></div><div class="pane-tools"></div><div class="pane-actions"></div><div class="pane-msg hidden"></div>';
+      '<div class="chart"></div><div class="legend"></div><div class="pane-tools"></div><div class="pane-actions"></div><div class="pat-tip hidden"></div><div class="pane-msg hidden"></div>';
     this.chartEl = el.querySelector(".chart");
     this.legendEl = el.querySelector(".legend");
     this.msgEl = el.querySelector(".pane-msg");
+    this.tipEl = el.querySelector(".pat-tip");
     this.toolsEl = el.querySelector(".pane-tools");
     this.actionsEl = el.querySelector(".pane-actions");
     this.toolsEl.onclick = (e) => this.paneTool(e);
@@ -205,7 +211,12 @@ export class ChartPane {
     });
     this.chart.subscribeCrosshairMove((p) => this.onCrosshair(p));
     this.chart.subscribeClick((p) => {
-      if (this.app.tool === "cursor") this.onClick(p);
+      if (this.app.tool !== "cursor") return;
+      // a click on a chart pattern selects it; a click anywhere else lets go of it and carries on as before
+      const key = p.point && this.patternPrim ? this.patternPrim.hit(p.point.x, p.point.y) : null;
+      if (key) return this.selectPattern(key, p.point);
+      if (this.selectedPattern) this.selectPattern(null);
+      this.onClick(p);
     });
     // Lightweight Charts drops a second click that lands within 500ms of the first (it waits for a
     // double-click), so drawing tools read native clicks instead.
@@ -244,6 +255,10 @@ export class ChartPane {
     if (this.volume) {
       this.chart.removeSeries(this.volume);
       this.volume = null;
+    }
+    if (this.volMA) {
+      this.chart.removeSeries(this.volMA);
+      this.volMA = null;
     }
     const up = css("--up"),
       down = css("--down"),
@@ -316,6 +331,15 @@ export class ChartPane {
         priceFormat: { type: "volume" },
         lastValueVisible: false,
         priceLineVisible: false,
+      });
+      // the 20-bar average of volume, on the same scale: bars above it are drawn stronger, bars below it fainter
+      this.volMA = this.chart.addSeries(LW.LineSeries, {
+        priceScaleId: "vol",
+        color: "#ffb62e",
+        lineWidth: 1.5,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
       });
       this.chart
         .priceScale("vol")
@@ -481,13 +505,22 @@ export class ChartPane {
     }
   }
 
-  volPoint(b) {
+  // up bars green, down bars red; stronger when the volume is above its 20-bar average, fainter when below
+  volPoint(b, ma = null) {
+    const strong = ma != null && (b.volume || 0) > ma;
+    const a = ma == null ? 0.45 : strong ? 0.8 : 0.35;
     return {
       time: this.toChart(b.time),
       value: b.volume || 0,
-      color:
-        b.close >= b.open ? "rgba(8,153,129,0.45)" : "rgba(242,54,69,0.45)",
+      color: b.close >= b.open ? `rgba(8,153,129,${a})` : `rgba(242,54,69,${a})`, // the candle colours
     };
+  }
+  volMaPoint(bars, i) {
+    const n = 20;
+    if (i < n - 1) return { time: this.toChart(bars[i].time) };
+    let sum = 0;
+    for (let k = i - n + 1; k <= i; k++) sum += bars[k].volume || 0;
+    return { time: this.toChart(bars[i].time), value: sum / n };
   }
 
   render(resetView) {
@@ -516,7 +549,11 @@ export class ChartPane {
         },
       });
     this.main.setData(this.shown.map((b) => this.pointFor(b)));
-    this.volume?.setData(this.shown.map((b) => this.volPoint(b)));
+    if (this.volume) {
+      const ma = this.shown.map((_, i) => this.volMaPoint(this.shown, i));
+      this.volume.setData(this.shown.map((b, i) => this.volPoint(b, ma[i].value ?? null)));
+      this.volMA?.setData(ma);
+    }
     this.chart.applyOptions({
       timeScale: {
         timeVisible: isIntraday(this.cfg.tf),
@@ -620,6 +657,9 @@ export class ChartPane {
     this.indSeries.clear();
     for (const vp of this.vpPrims || []) { try { this.main.detachPrimitive(vp); } catch { /* gone with the series */ } }
     this.vpPrims = [];
+    this.patternPrim = null;
+    this.patternList = [];
+    this.patternInd = null;
     while (this.chart.panes().length > 1) this.chart.removePane(this.chart.panes().length - 1);
     this.indResults = {};
     this.mtf ||= {};
@@ -658,10 +698,18 @@ export class ChartPane {
       if (res.chartPatterns) {
         // bar-index patterns only make sense on real bars: Renko, Kagi, Line break, Range, Point & figure and Heikin Ashi are rebuilt
         if (["renko", "linebreak", "range", "kagi", "pnf", "heikin"].includes(this.cfg.type)) res.error = "Not drawn on this chart type: use candles, bars or a line";
-        else {
-          const cp = new ChartPatterns(this, res.chartPatterns);
+        else if (!this.patternPrim) {
+          // the first All Chart Patterns indicator on the chart drives the list, the selection and the switches
+          const hidden = new Set(ind.hiddenPatterns || []);
+          this.patternList = res.chartPatterns.map((p) => ({ ...p, key: this.patternKey(p, bars) }));
+          const cp = new ChartPatterns(this, this.patternList);
+          cp.hidden = hidden;
+          cp.selected = this.patternList.some((p) => p.key === this.selectedPattern) ? this.selectedPattern : null;
+          if (!cp.selected) this.selectedPattern = null;
           this.main.attachPrimitive(cp);
           this.vpPrims.push(cp);
+          this.patternPrim = cp;
+          this.patternInd = ind;
         }
       }
       if (res.sessionProfile) {
@@ -709,6 +757,8 @@ export class ChartPane {
       this.main.setData(bars.map((b) => this.pointFor(b)));
     }
     this.paneGroups = groups.filter(Boolean);
+    this.showPatternTip();
+    this.app.onPatterns?.(this);
     if (this.maxUid && groupOf(this.paneGroups, this.maxUid) < 0) this.maxUid = null;
     const big = this.maxUid ? groupOf(this.paneGroups, this.maxUid) + 1 : -1;
     // a maximized lower pane takes the chart; the others shrink to a strip
@@ -816,9 +866,14 @@ export class ChartPane {
     const chg = b && prev ? ((b.close - prev.close) / prev.close) * 100 : null;
     const cls = chg == null ? "" : chg >= 0 ? "up" : "down";
     const name = `${ticker(this.cfg.symbol)} · ${this.cfg.tf} · ${this.provider || exchange(this.cfg.symbol)}`;
-    let html = `<div class="row"><span class="title" data-act="symbol">${esc(name)}</span>`;
-    if (b)
-      html += `<span class="ohlc ${cls}"><span><b>O</b>${fmtPrice(b.open)}</span><span><b>H</b>${fmtPrice(b.high)}</span><span><b>L</b>${fmtPrice(b.low)}</span><span><b>C</b>${fmtPrice(b.close)}</span><span>${fmtPct(chg)}</span></span>`;
+    let html = `<div class="row"><span class="title" data-act="symbol">${esc(name)}</span>${this.liveOn ? '<span class="live" title="The exchange is open: this chart refreshes by itself">● live</span>' : ""}`;
+    if (b) {
+      const day = this.step < 86400
+        ? new Date(b.time * 1000).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+        : new Date(b.time * 1000).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+      const abs = prev ? b.close - prev.close : null;
+      html += `<span class="ohlc ${cls}"><span class="when">${esc(day)}</span><span><b>O</b>${fmtPrice(b.open)}</span><span><b>H</b>${fmtPrice(b.high)}</span><span><b>L</b>${fmtPrice(b.low)}</span><span><b>C</b>${fmtPrice(b.close)}</span><span>${abs == null ? "" : `${abs >= 0 ? "+" : ""}${fmtPrice(abs)} `}${fmtPct(chg)}</span>${b.volume ? `<span class="vol"><b>Vol</b>${fmtNum(b.volume)}</span>` : ""}</span>`;
+    }
     html += "</div>";
     for (const sym of this.cfg.compare) {
       html += `<div class="row ind" data-compare="${esc(sym)}"><span class="name">${esc(ticker(sym))} (compare)</span><span class="acts"><button data-act="rmcompare" title="Remove">${ICON.x}</button></span></div>`;
@@ -868,6 +923,96 @@ export class ChartPane {
       }
       if (act === "settings") this.app.openIndicatorSettings(this, ind);
     };
+  }
+
+  // ---------- chart patterns: select one, read its levels, jump to it, switch it off ----------
+  // A pattern has no id: it is named by its type and the times of its first and last points, which survive a reload
+  // and the arrival of new bars (an index would not).
+  patternKey(p, bars) {
+    return `${p.type}|${bars[p.points[0].i]?.time}|${bars[p.points.at(-1).i]?.time}`;
+  }
+  patternByKey(key) {
+    return this.patternList.find((p) => p.key === key) || null;
+  }
+  selectPattern(key, at = null) {
+    this.selectedPattern = key;
+    if (this.patternPrim) {
+      this.patternPrim.selected = key;
+      this.patternPrim.requestUpdate?.();
+    }
+    this.tipAt = key ? at : null;
+    this.showPatternTip();
+    this.app.onPatterns?.(this);
+  }
+  showPatternTip() {
+    const p = this.selectedPattern && this.patternByKey(this.selectedPattern);
+    const el = this.tipEl;
+    if (!el) return;
+    if (!p || this.patternPrim?.hidden.has(p.key)) {
+      el.classList.add("hidden");
+      return;
+    }
+    const when = (i) => {
+      const t = this.shown[i]?.time;
+      if (!t) return "—";
+      const d = new Date(t * 1000).toISOString();
+      return this.step < 86400 ? `${d.slice(0, 10)} ${d.slice(11, 16)}` : d.slice(0, 10);
+    };
+    const f = (v) => (v == null ? "—" : Number(v).toFixed(2));
+    const risk = p.entry != null && p.stop != null ? Math.abs(p.entry - p.stop) : null;
+    const reward = p.entry != null && p.target ? Math.abs(p.target.price - p.entry) : null;
+    const dirText = p.dir === "bull" ? "Bullish: breaks up" : p.dir === "bear" ? "Bearish: breaks down" : "Neutral: breaks either way";
+    el.style.setProperty("--pat", patternColour(p, document.documentElement.dataset.theme));
+    el.innerHTML = `<div class="pt-head"><b>${esc(p.type)}</b><span class="pt-badge">${esc(p.status)}</span></div>
+      <div class="pt-dir">${esc(dirText)}</div>
+      <div class="pt-grid">
+        <span>First point</span><span>${esc(when(p.points[0].i))}</span>
+        <span>Last point</span><span>${esc(when(p.points.at(-1).i))}</span>
+        <span>Broke out</span><span>${p.breakI == null ? "not yet" : esc(when(p.breakI))}</span>
+        <span>Entry (break)</span><span>${f(p.entry)}</span>
+        <span>Stop</span><span class="down">${f(p.stop)}</span>
+        <span>Target</span><span class="up">${f(p.target?.price)}</span>
+        <span>Risk / reward</span><span>${risk && reward ? `${f(risk)} / ${f(reward)} (${(reward / risk).toFixed(1)}R)` : "—"}</span>
+      </div>
+      <div class="pt-foot">Measured from the pattern's own size. A guide, not advice. Esc or click away to close.</div>`;
+    el.classList.remove("hidden");
+    // beside the click, kept inside the chart; or, when jumped to from the list, at the pattern's own label
+    const r = this.el.getBoundingClientRect(), g = this.patternPrim?.geom.find((x) => x.key === p.key);
+    const pill = g?.pills[0];
+    const ax = this.tipAt?.x ?? (pill ? pill.x + 12 : 80), ay = this.tipAt?.y ?? (pill ? pill.y + 26 : 80);
+    const w = el.offsetWidth || 230, h = el.offsetHeight || 190;
+    el.style.left = `${Math.max(6, Math.min(r.width - w - 70, ax + 14))}px`;
+    el.style.top = `${Math.max(6, Math.min(r.height - h - 8, ay + 14))}px`;
+  }
+  // Scroll and zoom so the whole pattern (its points, breakout and target line) is in view, then select it.
+  jumpToPattern(key) {
+    const p = this.patternByKey(key);
+    if (!p) return;
+    if (this.patternInd?.hiddenPatterns?.includes(key)) this.setPatternVisible(key, true);
+    const last = Math.max(p.points.at(-1).i, p.breakI ?? 0, p.target?.toI ?? 0);
+    const pad = Math.max(6, Math.round((last - p.points[0].i) * 0.25));
+    this.chart.timeScale().setVisibleLogicalRange({ from: p.points[0].i - pad, to: Math.min(this.shown.length + 6, last + pad) });
+    this.tipAt = null;
+    this.selectPattern(key);
+    requestAnimationFrame(() => requestAnimationFrame(() => this.showPatternTip())); // after the redraw has placed the label
+  }
+  setPatternVisible(key, on) {
+    const ind = this.patternInd;
+    if (!ind) return;
+    const hidden = new Set(ind.hiddenPatterns || []);
+    on ? hidden.delete(key) : hidden.add(key);
+    ind.hiddenPatterns = [...hidden];
+    if (!on && this.selectedPattern === key) this.selectedPattern = null;
+    this.render(false);
+    this.app.persist();
+  }
+  setAllPatternsVisible(on) {
+    const ind = this.patternInd;
+    if (!ind) return;
+    ind.hiddenPatterns = on ? [] : this.patternList.map((p) => p.key);
+    if (!on) this.selectedPattern = null;
+    this.render(false);
+    this.app.persist();
   }
 
   // ---------- lower-pane headers: name, move up and down, maximize, settings, delete ----------
@@ -1077,6 +1222,7 @@ export class ChartPane {
   }
 
   poll() {
+    if (exchange(this.cfg.symbol) === "DSE") return this.pollDse();
     const kind = ["BINANCE", "COINBASE", "KRAKEN", "BYBIT", "BLOFIN"].includes(
       exchange(this.cfg.symbol),
     )
@@ -1094,9 +1240,39 @@ export class ChartPane {
     this.liveTimer = setTimeout(tick, kind);
   }
 
+  // DSE: ask for the newest bars every 10 s (30 s on hourly) while the exchange is open, and once a minute otherwise,
+  // with one last ask right after it closes so the closing bar is the final one. `liveOn` lights the "live" badge.
+  pollDse() {
+    const intraday = isIntraday(this.cfg.tf);
+    let wasOpen = isSessionOpen(Date.now());
+    if (this.liveOn !== wasOpen) {
+      this.liveOn = wasOpen;
+      this.updateLegend();
+    }
+    const tick = async () => {
+      const now = Date.now(), open = isSessionOpen(now);
+      if (open || wasOpen) {
+        try {
+          const r = await api.candles(this.cfg.symbol, this.cfg.tf, 5, !!this.cfg.adjusted);
+          this.merge(r.candles);
+        } catch {
+          /* keep trying */
+        }
+      }
+      if (open !== this.liveOn) {
+        this.liveOn = open;
+        this.updateLegend();
+      }
+      wasOpen = open;
+      this.liveTimer = setTimeout(tick, pollDelayMs(Date.now(), intraday));
+    };
+    this.liveTimer = setTimeout(tick, pollDelayMs(Date.now(), intraday));
+  }
+
   stopLive() {
     clearTimeout(this.liveTimer);
     this.liveTimer = null;
+    this.liveOn = false;
     if (this.ws) {
       const ws = this.ws;
       this.ws = null;
@@ -1136,7 +1312,11 @@ export class ChartPane {
       if (this.times.at(-1) !== this.toChart(last.time))
         this.times.push(this.toChart(last.time));
       this.main.update(this.pointFor(last));
-      this.volume?.update(this.volPoint(last));
+      if (this.volume) {
+        const m = this.volMaPoint(this.bars, this.bars.length - 1);
+        this.volume.update(this.volPoint(last, m.value ?? null));
+        this.volMA?.update(m);
+      }
     }
     const now = Date.now();
     if (now - (this.mtfCheckedAt || 0) > 60000) {

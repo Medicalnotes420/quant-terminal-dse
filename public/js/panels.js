@@ -1,4 +1,5 @@
 // Side panel (watchlist, alerts, calendar) and bottom panel (tester, screener, heatmap, paper, editor).
+import { patternColour } from "./chart-patterns.js";
 import {
   api,
   download,
@@ -251,6 +252,7 @@ export function initPanels(app) {
       watchlist: renderWatchlist,
       shares: renderShares,
       details: renderDetails,
+      patterns: renderPatternsTab,
       alerts: renderAlerts,
       calendar: renderCalendar,
       news: () => renderNews(side, app),
@@ -462,6 +464,50 @@ export function initPanels(app) {
         h += `<div class="dt-sec">News</div>` + c.news.map((x) => `<details class="dt-news"><summary>${esc(x.summary || x.type)} <span class="muted">${esc(x.date)}</span></summary><p>${esc(x.body || "No text.")}</p></details>`).join("");
     }
     side.innerHTML = h;
+  }
+
+  // ======================= PATTERNS =======================
+  // Every pattern the chart's All Chart Patterns indicator found: a switch to draw it or not, and a click to jump to it.
+  function renderPatternsTab() {
+    const keep = side.querySelector("#ptRows")?.scrollTop || 0;
+    const p = app.active;
+    if (!p?.patternInd) {
+      side.innerHTML = `<div class="pad hint-text">This chart has no pattern indicator. Add it to find flags, pennants, tops, bottoms, head and shoulders, wedges, triangles, rectangles and cup and handle.</div><div class="pad"><button class="btn primary" id="ptAdd">Add All Chart Patterns</button></div>`;
+      $("#ptAdd").onclick = () => {
+        p?.addIndicator("chartpatterns");
+        renderPatternsTab();
+      };
+      return;
+    }
+    const hidden = new Set(p.patternInd.hiddenPatterns || []);
+    const theme = document.documentElement.dataset.theme;
+    const list = [...p.patternList].sort((a, b) => b.points.at(-1).i - a.points.at(-1).i);
+    const day = (i) => {
+      const t = p.shown[i]?.time;
+      return t ? new Date(t * 1000).toISOString().slice(0, p.step < 86400 ? 16 : 10).replace("T", " ") : "";
+    };
+    side.innerHTML = `<div class="wl-head"><span class="hint-text" style="flex:1">${list.length - hidden.size} of ${list.length} drawn</span><button class="btn small" id="ptAll">Show all</button><button class="btn small" id="ptNone">Hide all</button></div>
+      <div id="ptRows" class="pt-rows">${
+        list.map((x) => {
+          const on = !hidden.has(x.key);
+          return `<div class="pt-row ${x.key === p.selectedPattern ? "current" : ""} ${on ? "" : "off"}" data-k="${esc(x.key)}">
+            <input type="checkbox" class="pt-sw" ${on ? "checked" : ""} title="${on ? "Hide this pattern" : "Draw this pattern"}">
+            <span class="pt-dot" style="background:${patternColour(x, theme)}"></span>
+            <span class="pt-name">${esc(x.type)}<small>${esc(day(x.points[0].i))} to ${esc(day(x.points.at(-1).i))}</small></span>
+            <span class="pt-st">${esc(x.status)}<small>${x.target ? `target ${esc(Number(x.target.price).toFixed(2))}` : ""}</small></span></div>`;
+        }).join("") || '<div class="pad hint-text">No pattern found in these bars.</div>'
+      }</div>`;
+    $("#ptAll").onclick = () => p.setAllPatternsVisible(true);
+    $("#ptNone").onclick = () => p.setAllPatternsVisible(false);
+    const rows = $("#ptRows");
+    rows.scrollTop = keep;
+    rows.onclick = (e) => {
+      const row = e.target.closest(".pt-row");
+      if (!row) return;
+      const key = row.dataset.k;
+      if (e.target.closest(".pt-sw")) return p.setPatternVisible(key, e.target.checked); // the switch
+      p.jumpToPattern(key);
+    };
   }
 
   // ======================= ALERTS =======================
@@ -1765,6 +1811,9 @@ export function initPanels(app) {
   };
 
   // ---------- hooks for the app ----------
+  P.onPatterns = () => {
+    if (sideTab === "patterns") renderPatternsTab();
+  };
   P.showBottom = showBottom;
   P.showSide = showSide;
   P.openAlertDialog = openAlertDialog;

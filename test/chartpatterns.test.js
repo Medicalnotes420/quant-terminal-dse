@@ -138,3 +138,18 @@ test('short or flat series give nothing and do not throw', () => {
   assert.deepEqual(detect(path([[0, 100], [8, 101]])), []);
   assert.deepEqual(detect(path([[0, 100], [200, 100]])), []);
 });
+
+test('each pattern reports its entry (where it broke) and its stop (where it is wrong)', () => {
+  const dt = find(path(DOUBLE_TOP), 'Double Top');
+  assert.ok(Math.abs(dt.entry - 105) < 0.5, `the neckline, got ${dt.entry}`);
+  assert.ok(dt.stop > 119 && dt.stop < 122, `the top, got ${dt.stop}`);
+  const up = find(path(mirror(DOUBLE_TOP)), 'Double Bottom');
+  assert.ok(Math.abs(up.entry - 115) < 0.5 && up.stop < 101 && up.stop > 98, `entry ${up.entry}, stop ${up.stop}`);
+  const hs = find(path(HEAD_SHOULDERS), 'Head And Shoulders');
+  assert.ok(hs.stop > 124 && hs.stop < 127, 'the head');
+  const tri = find(path(TRIANGLE), 'Triangle');
+  assert.equal(tri.dir, 'bull');
+  assert.ok(tri.stop < tri.entry, 'a bull break of a triangle is wrong below its lower line');
+  const forming = find(path(DOUBLE_TOP).slice(0, 49), 'Double Top', { inProgress: true });
+  assert.equal(forming.entry, null);
+});
