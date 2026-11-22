@@ -63,3 +63,14 @@ test("tickers lists indices then shares, and the CSV export has one row per bar"
   assert.deepEqual([t.slice(0, 3), t.at(-1), t.length], [["DSEX", "DS30", "ABC"], "XYZ", 2 + 1 + 25 + 1]);
   assert.equal(dse.csvOf("ABC").trim().split("\n").length, 4);
 });
+
+test("snapshot lists each share's last close and day change, and leaves stopped shares out", () => {
+  const s = dse.snapshot();
+  const abc = s.find((r) => r.ticker === "ABC");
+  assert.equal(abc.symbol, "DSE:ABC");
+  assert.equal(abc.price, 12);
+  assert.ok(Math.abs(abc.changePct - ((12 - 11) / 11) * 100) < 1e-9);
+  assert.equal(abc.date, "2026-11-04");
+  assert.ok(s.every((r) => !r.ticker.startsWith("DSE")), "indexes are not shares");
+  assert.deepEqual(s.map((r) => r.ticker), [...s.map((r) => r.ticker)].sort());
+});

@@ -30,6 +30,7 @@ export const api = {
       "GET",
       `/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}&limit=${limit}`,
     ),
+  dseShares: () => req("GET", "/api/dse/shares"),
   patterns: (symbol) => req("GET", `/api/patterns?symbol=${encodeURIComponent(symbol)}`),
   quotes: (symbols) =>
     req("GET", `/api/quotes?symbols=${encodeURIComponent(symbols.join(","))}`),

@@ -70,12 +70,6 @@ export const TOOLS = [
     icon: '<rect x="4" y="5" width="16" height="7" fill="currentColor" fill-opacity=".25"/><rect x="4" y="12" width="16" height="7"/>',
   },
   {
-    id: "short",
-    label: "Short position",
-    points: 2,
-    icon: '<rect x="4" y="5" width="16" height="7"/><rect x="4" y="12" width="16" height="7" fill="currentColor" fill-opacity=".25"/>',
-  },
-  {
     id: "text",
     label: "Text note",
     points: 1,

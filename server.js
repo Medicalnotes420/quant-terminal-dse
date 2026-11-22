@@ -16,6 +16,7 @@ import * as imports from "./lib/imports.js";
 import * as alerts from "./lib/alerts.js";
 import * as store from "./lib/store.js";
 import * as patterns from "./lib/patterns.js";
+import * as dse from "./lib/dse.js";
 import * as info from "./lib/market-info.js";
 import { registerIndicator, INDICATORS } from "./public/lib/indicators.js";
 import { conditionFn, backtest, magnifierTf } from "./public/lib/backtest.js";
@@ -243,6 +244,7 @@ async function handle(req, res) {
       return send(res, 200, await data.resolve(q.symbol));
     if (p === "/api/search") return send(res, 200, await data.search(q.q));
     if (p === "/api/spread") return send(res, 200, await data.getSpread(q.symbol));
+    if (p === "/api/dse/shares") return send(res, 200, dse.snapshot());
     if (p === "/api/patterns") return send(res, 200, await patterns.detections(q.symbol));
     if (p === "/api/candles")
       return send(

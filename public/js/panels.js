@@ -249,6 +249,7 @@ export function initPanels(app) {
   const renderSide = () =>
     ({
       watchlist: renderWatchlist,
+      shares: renderShares,
       alerts: renderAlerts,
       calendar: renderCalendar,
       news: () => renderNews(side, app),
@@ -356,6 +357,62 @@ export function initPanels(app) {
   }
   setInterval(refreshQuotes, 5000);
   refreshQuotes();
+
+  // ======================= ALL SHARES =======================
+  // Every DSE share with its last close and change, sorted and searched here. The star adds a share to, or
+  // takes it off, the Favorites list that is open (the same list as the Favorites tab).
+  const COMPACT = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+  let shareRows = null, shareSort = { key: "ticker", dir: 1 }, shareQ = "";
+  async function renderShares() {
+    side.innerHTML = `<div class="wl-head"><span class="hint-text" id="shNote">Loading…</span></div>
+      <div style="padding:8px"><input class="in" id="shQ" placeholder="Search shares" style="width:100%" value="${esc(shareQ)}"></div>
+      <div class="sh-head">${[["ticker", "Share"], ["price", "Last"], ["changePct", "Change"], ["volume", "Volume"]].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join("")}</div>
+      <div id="shRows"></div>`;
+    $("#shQ").oninput = (e) => {
+      shareQ = e.target.value.trim().toUpperCase();
+      drawShares();
+    };
+    $(".sh-head").onclick = (e) => {
+      const k = e.target.dataset.k;
+      if (!k) return;
+      shareSort = { key: k, dir: shareSort.key === k ? -shareSort.dir : k === "ticker" ? 1 : -1 };
+      drawShares();
+    };
+    $("#shRows").onclick = (e) => {
+      const row = e.target.closest(".wl-row");
+      if (!row) return;
+      const sym = row.dataset.sym, list = wlSymbols();
+      if (e.target.closest(".star")) {
+        app.state.watchlists[app.state.activeWatchlist] = list.includes(sym) ? list.filter((x) => x !== sym) : [...list, sym];
+        app.persist();
+        refreshQuotes();
+        return drawShares();
+      }
+      app.setSymbol(sym);
+    };
+    if (!shareRows) {
+      try {
+        shareRows = await api.dseShares();
+      } catch (err) {
+        $("#shNote") && ($("#shNote").textContent = err.message);
+        return;
+      }
+    }
+    drawShares();
+  }
+  function drawShares() {
+    const box = $("#shRows");
+    if (!box || !shareRows) return;
+    const { key, dir } = shareSort, mine = new Set(wlSymbols()), cur = app.active?.cfg.symbol;
+    const rows = shareRows
+      .filter((r) => !shareQ || r.ticker.includes(shareQ))
+      .sort((a, b) => (key === "ticker" ? (a.ticker < b.ticker ? -1 : 1) * dir : ((a[key] ?? -Infinity) - (b[key] ?? -Infinity)) * dir));
+    $("#shNote").textContent = `${rows.length} of ${shareRows.length} shares · last close ${shareRows[0]?.date || ""} · star = ${app.state.activeWatchlist}`;
+    document.querySelectorAll(".sh-head button").forEach((b) => b.classList.toggle("on", b.dataset.k === key));
+    box.innerHTML = rows
+      .map((r) => `<div class="wl-row sh-row ${r.symbol === cur ? "current" : ""}" data-sym="${esc(r.symbol)}"><span class="sh-name"><button class="star ${mine.has(r.symbol) ? "on" : ""}" title="${mine.has(r.symbol) ? "Remove from" : "Add to"} Favorites">${mine.has(r.symbol) ? "★" : "☆"}</button><span class="sym">${esc(r.ticker)}</span></span><span class="px">${fmtPrice(r.price)}</span><span class="chg ${r.changePct >= 0 ? "up" : "down"}">${fmtPct(r.changePct)}</span><span class="vol">${COMPACT.format(r.volume)}</span></div>`)
+      .join("") || '<div class="pad hint-text">No share matches.</div>';
+  }
 
   // ======================= ALERTS =======================
   async function renderAlerts() {

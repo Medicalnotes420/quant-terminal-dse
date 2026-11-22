@@ -1013,3 +1013,16 @@ table.t.heat td { text-align: center; } table.t.heat td.base { outline: 2px soli
 .grid.has-max { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; }
 .grid.has-max .pane:not(.max) { display: none; }
 .grid.has-max .pane.max { grid-row: auto !important; }
+
+/* All shares: the header and every row share one four-column grid, all centred */
+.sh-head, .wl-row.sh-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 6px; padding: 0 10px; text-align: center; align-items: center; }
+.sh-head { padding-bottom: 4px; font-size: 11px; }
+.wl-row.sh-row { padding-top: 6px; padding-bottom: 6px; }
+.sh-head button { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 2px 4px; border-radius: 3px; }
+.sh-head button:first-child { text-align: left; padding-left: 18px; }
+.sh-head button.on { color: var(--text); background: var(--hover); }
+.sh-row .sh-name { display: flex; align-items: center; justify-content: flex-start; gap: 2px; min-width: 0; }
+.sh-row .px, .sh-row .chg, .sh-row .vol { text-align: center; font-variant-numeric: tabular-nums; }
+.sh-row .vol { color: var(--muted); }
+.wl-row .star { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 4px 0 0; font-size: 14px; line-height: 1; }
+.wl-row .star.on, .wl-row .star:hover { color: #f7a600; }
