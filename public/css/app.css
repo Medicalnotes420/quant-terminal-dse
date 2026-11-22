@@ -999,3 +999,17 @@ a.card.news:hover { border-color: var(--accent); }
 #tQuant { margin-top: 4px; }
 table.t.heat td { text-align: center; } table.t.heat td.base { outline: 2px solid var(--gold); outline-offset: -2px; font-weight: 700; }
 .ptq-verdict.warn { color: #f7a600; }
+
+/* lower-pane headers and chart buttons */
+.pane-tools { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.ptb { position: absolute; left: 8px; display: flex; align-items: center; gap: 2px; font-size: 12px; opacity: 0.6; }
+.ptb:hover { opacity: 1; }
+.ptb-name { color: var(--muted); margin-right: 4px; pointer-events: none; }
+.ptb button, .pane-actions button { pointer-events: auto; border: 0; background: var(--panel); color: var(--muted); cursor: pointer; border-radius: 3px; height: 20px; width: 20px; padding: 0; display: inline-grid; place-items: center; }
+.ptb button:hover, .pane-actions button:hover { color: var(--text); background: var(--hover); }
+.ptb svg, .pane-actions svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pane-actions { position: absolute; top: 5px; right: 72px; z-index: 6; display: flex; gap: 3px; opacity: 0.55; }
+.pane:hover .pane-actions { opacity: 1; }
+.grid.has-max { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; }
+.grid.has-max .pane:not(.max) { display: none; }
+.grid.has-max .pane.max { grid-row: auto !important; }

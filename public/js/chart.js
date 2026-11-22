@@ -1,6 +1,7 @@
 // One chart: candles + volume + any number of indicators, drawings, compare symbols, replay and live data.
 import { api, fmtPrice, fmtPct, esc, ticker, exchange } from "./api.js";
 import { BY_ID, compute, periodKey } from "../lib/indicators.js";
+import { reorder, withoutGroup, groupOf } from "../lib/panes.js";
 import {
   parseTf,
   isIntraday,
@@ -57,6 +58,10 @@ const ICON = {
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
   eye: '<svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  up: '<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+  max: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+  restore: '<svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>',
 };
 const css = (name) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -124,7 +129,7 @@ export class ChartPane {
     this.app = app;
     this.el = el;
     this.cfg = {
-      symbol: "BINANCE:BTCUSDT",
+      symbol: "DSE:DSEX",
       tf: "1D",
       type: "candles",
       indicators: [],
@@ -140,12 +145,24 @@ export class ChartPane {
     this.compareSeries = new Map();
     this.extraMarkers = [];
     this.replay = null;
+    this.paneGroups = []; // uids of the indicators in each lower pane, set while drawing
+    this.maxUid = null; // the lower pane (by its first indicator) that fills the chart, or null
     el.innerHTML =
-      '<div class="chart"></div><div class="legend"></div><div class="pane-msg hidden"></div>';
+      '<div class="chart"></div><div class="legend"></div><div class="pane-tools"></div><div class="pane-actions"></div><div class="pane-msg hidden"></div>';
     this.chartEl = el.querySelector(".chart");
     this.legendEl = el.querySelector(".legend");
     this.msgEl = el.querySelector(".pane-msg");
+    this.toolsEl = el.querySelector(".pane-tools");
+    this.actionsEl = el.querySelector(".pane-actions");
+    this.toolsEl.onclick = (e) => this.paneTool(e);
+    this.actionsEl.onclick = (e) => {
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      if (act) app.paneAction(this, act);
+    };
     this.createChart();
+    // headers follow the pane heights: on resize, and after a separator is dragged
+    new ResizeObserver(() => this.positionPaneTools()).observe(this.chartEl);
+    this.chartEl.addEventListener("mouseup", () => requestAnimationFrame(() => this.positionPaneTools()));
     el.addEventListener("mousedown", () => app.setActive(this), true);
   }
 
@@ -617,6 +634,7 @@ export class ChartPane {
     const ordered = [...this.cfg.indicators].sort((x, y) => depth(x) - depth(y));
     let paneIdx = 0;
     const paneOf = {};
+    const groups = [];
     const markers = [];
     const barColorAt = new Map();
     for (const ind of ordered) {
@@ -647,6 +665,7 @@ export class ChartPane {
       const parentPane = src.startsWith("ind:") ? paneOf[src.split(":")[1]] : undefined;
       const pane = parentPane !== undefined ? parentPane : def.overlay ? 0 : ++paneIdx;
       paneOf[ind.uid] = pane;
+      if (pane > 0) (groups[pane - 1] ||= []).push(ind.uid);
       const list = [];
       for (const out of outs) {
         const color = ind.colors?.[out.key] || out.color;
@@ -677,7 +696,12 @@ export class ChartPane {
       this.barColorAt = recolor;
       this.main.setData(bars.map((b) => this.pointFor(b)));
     }
-    this.chart.panes().forEach((p, i) => p.setStretchFactor(i === 0 ? 1 : 0.28));
+    this.paneGroups = groups.filter(Boolean);
+    if (this.maxUid && groupOf(this.paneGroups, this.maxUid) < 0) this.maxUid = null;
+    const big = this.maxUid ? groupOf(this.paneGroups, this.maxUid) + 1 : -1;
+    // a maximized lower pane takes the chart; the others shrink to a strip
+    this.chart.panes().forEach((p, i) => p.setStretchFactor(big < 0 ? (i === 0 ? 1 : 0.28) : i === big ? 1 : 0.02));
+    requestAnimationFrame(() => this.positionPaneTools());
     const all = [...markers, ...this.extraMarkers, ...(this.cfg.patterns ? this.patternMarkers() : [])]
       .map((m) => ({ ...m, time: this.toChart(m.time) }))
       .filter((m) => !this.replay || m.time <= this.times.at(-1));
@@ -830,6 +854,46 @@ export class ChartPane {
       }
       if (act === "settings") this.app.openIndicatorSettings(this, ind);
     };
+  }
+
+  // ---------- lower-pane headers: name, move up and down, maximize, settings, delete ----------
+  positionPaneTools() {
+    const panes = this.chart.panes(), groups = this.paneGroups;
+    const base = this.chartEl.getBoundingClientRect().top;
+    let html = "";
+    groups.forEach((g, gi) => {
+      const pane = panes[gi + 1];
+      if (!pane) return;
+      const top = pane.getHTMLElement().getBoundingClientRect().top - base;
+      const ind = this.cfg.indicators.find((x) => x.uid === g[0]);
+      const def = ind && BY_ID[ind.id];
+      if (!def) return;
+      const short = /\(([^)]+)\)$/.exec(def.name)?.[1].split(" / ")[0] || def.name;
+      const big = this.maxUid === g[0];
+      const btn = (act, title, icon, off) => (off ? "" : `<button data-act="${act}" title="${title}">${icon}</button>`);
+      html += `<div class="ptb" data-i="${gi}" style="top:${Math.round(top) + 3}px"><span class="ptb-name">${esc(short)} ${esc(this.indicatorParamsLabel(ind))}</span>`
+        + btn("up", "Move pane up", ICON.up, gi === 0) + btn("down", "Move pane down", ICON.down, gi === groups.length - 1)
+        + btn("max", big ? "Restore pane size" : "Maximize pane", big ? ICON.restore : ICON.max)
+        + btn("settings", "Indicator settings", ICON.gear) + btn("remove", "Delete pane", ICON.x) + "</div>";
+    });
+    if (this.toolsEl.innerHTML !== html) this.toolsEl.innerHTML = html;
+  }
+
+  paneTool(e) {
+    const act = e.target.closest("[data-act]")?.dataset.act;
+    const gi = Number(e.target.closest("[data-i]")?.dataset.i);
+    const g = this.paneGroups[gi];
+    if (!act || !g) return;
+    const ind = this.cfg.indicators.find((x) => x.uid === g[0]);
+    if (act === "settings") return ind && this.app.openIndicatorSettings(this, ind);
+    if (act === "max") this.maxUid = this.maxUid === g[0] ? null : g[0];
+    if (act === "up" || act === "down") this.cfg.indicators = reorder(this.cfg.indicators, this.paneGroups, gi, act === "up" ? -1 : 1);
+    if (act === "remove") {
+      this.cfg.indicators = withoutGroup(this.cfg.indicators, this.paneGroups, gi);
+      if (this.maxUid === g[0]) this.maxUid = null;
+    }
+    this.render(false);
+    this.app.persist();
   }
 
   // ---------- indicators ----------

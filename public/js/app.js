@@ -8,10 +8,11 @@ import {
   compute,
 } from "../lib/indicators.js";
 import { parseTf, toCsv } from "../lib/series.js";
+import { canClose } from "../lib/panes.js";
 import { initPanels } from "./panels.js";
 
 const $ = (s, el = document) => el.querySelector(s);
-const TF_QUICK = ["1m", "5m", "15m", "1h", "4h", "1D", "1W"];
+const TF_QUICK = ["1D", "1W", "1M"]; // DSE history is daily
 const LAYOUTS = { 1: 1, "2v": 2, "2h": 2, 3: 3, 4: 4, 6: 6, 8: 8, 16: 16 };
 const DEFAULT_WATCHLISTS = {
   Main: [
@@ -24,6 +25,11 @@ const DEFAULT_WATCHLISTS = {
   ],
 };
 // Only DSE shares and your own CSV files are served, so anything else saved earlier is dropped on load.
+const PA_ICON = {
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  max: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+  restore: '<svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>',
+};
 const isDse = (s) => /^(DSE|CSV):/.test(String(s));
 
 class App {
@@ -179,7 +185,7 @@ class App {
       ? this.panes.map((p) => p.cfg)
       : this.state.panes;
     while (this.panes.length > count) this.panes.pop().destroy();
-    const tfs = ["1D", "4h", "1h", "15m", "1W", "5m", "30m", "2h"];
+    const tfs = ["1D", "1W", "1M", "1D", "1W", "1M", "1D", "1W"];
     for (let i = 0; i < count; i++) {
       if (this.panes[i]) continue;
       const el = document.createElement("div");
@@ -199,11 +205,46 @@ class App {
     });
     if (count === 3) this.panes[0].el.style.gridRow = "span 2";
     else if (this.panes[0]) this.panes[0].el.style.gridRow = "";
+    grid.classList.remove("has-max");
+    for (const p of this.panes) p.el.classList.remove("max");
     this.setActive(
       this.panes[Math.min(this.state.active ?? 0, count - 1)] || this.panes[0],
     );
+    this.updatePaneActions();
     $("#layoutSel").value = this.state.layout;
     if (save) this.persist();
+  }
+
+  // The buttons in a chart's top-right corner: fill the window, and close this chart.
+  updatePaneActions() {
+    const many = this.panes.length > 1;
+    for (const p of this.panes) {
+      const full = p.el.classList.contains("max");
+      p.actionsEl.innerHTML = many
+        ? `<button data-act="maxchart" title="${full ? "Restore the layout (Esc)" : "Fill the window"}">${full ? PA_ICON.restore : PA_ICON.max}</button>`
+          + (canClose(this.panes.length) && !full ? `<button data-act="closechart" title="Close this chart">${PA_ICON.x}</button>` : "")
+        : "";
+    }
+  }
+
+  paneAction(pane, act) {
+    if (act === "maxchart") {
+      const on = !pane.el.classList.contains("max");
+      for (const p of this.panes) p.el.classList.remove("max");
+      if (on) pane.el.classList.add("max");
+      $("#grid").classList.toggle("has-max", on);
+      this.setActive(pane);
+      this.updatePaneActions();
+    }
+    if (act === "closechart" && canClose(this.panes.length)) {
+      const i = this.panes.indexOf(pane);
+      this.panes.splice(i, 1);
+      pane.destroy();
+      pane.el.remove();
+      const n = this.panes.length;
+      if (this.active === pane) this.active = null;
+      this.setLayout(n === 2 ? "2v" : String(n));
+    }
   }
 
   setActive(pane) {
@@ -658,6 +699,8 @@ class App {
       if (e.key === "Escape") {
         if (!$("#modal").classList.contains("hidden")) return this.closeModal();
         if (this.tool !== "cursor") return this.setTool("cursor");
+        const full = this.panes.find((p) => p.el.classList.contains("max"));
+        if (full) return this.paneAction(full, "maxchart");
         if (this.active?.drawings.selected) {
           this.active.drawings.selected = null;
           this.active.drawings.update();
