@@ -12,7 +12,7 @@ import { canClose } from "../lib/panes.js";
 import { initPanels } from "./panels.js";
 
 const $ = (s, el = document) => el.querySelector(s);
-const TF_QUICK = ["1D", "1W", "1M"]; // DSE history is daily
+const TF_QUICK = ["1h", "1D", "1W", "1M"]; // DSE: hourly from StockNow, daily history from your files
 const LAYOUTS = { 1: 1, "2v": 2, "2h": 2, 3: 3, 4: 4, 6: 6, 8: 8, 16: 16 };
 const DEFAULT_WATCHLISTS = {
   Main: [

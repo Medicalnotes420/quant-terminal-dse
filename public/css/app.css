@@ -1038,3 +1038,9 @@ table.t.heat td { text-align: center; } table.t.heat td.base { outline: 2px soli
 .dt-news { padding: 4px 10px; font-size: 12px; border-bottom: 1px solid var(--border); }
 .dt-news summary { cursor: pointer; }
 .dt-news p { margin: 4px 0; color: var(--muted); }
+
+/* chart text that sits over candles: a halo in the chart colour keeps it readable on any candle */
+.legend { text-shadow: 0 0 3px var(--bg), 0 0 3px var(--bg), 0 0 6px var(--bg); }
+.legend .note { color: #ffc24d; font-size: 11.5px; background: color-mix(in srgb, var(--bg) 82%, transparent); border-radius: 4px; padding: 1px 6px; margin-top: 2px; width: fit-content; }
+.legend .row .name, .legend .ind .vals { font-weight: 500; }
+.ptb-name { text-shadow: 0 0 3px var(--bg), 0 0 3px var(--bg); font-weight: 600; }

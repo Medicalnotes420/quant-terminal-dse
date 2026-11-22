@@ -25,6 +25,18 @@ const bulk = [];
 for (let i = 0; i < 25; i++)
   for (const [d, c] of [["2026-11-02", 100], ["2026-11-03", 102], ["2026-11-04", 101.02]]) bulk.push(`${d},T${String(i).padStart(2, "0")},${c},${c},${c},${c},3,1,100`);
 fs.writeFileSync(path.join(dir, "dayend_stocknow_bulk.csv"), H + bulk.join("\n"));
+// A stand-in for StockNow's hourly history: columns open, high, low, close, volume, UTC seconds (1 Nov 2026 is a Sunday)
+import http from "node:http";
+const T0 = Date.UTC(2026, 10, 1, 4) / 1000;
+let hourlyHits = 0;
+const stocknow = http.createServer((req, res) => {
+  hourlyHits++;
+  if (req.url.startsWith("/GONE/")) { res.writeHead(404); return res.end("no"); }
+  const t = [0, 1, 2, 3, 4, 5].map((k) => T0 + k * 3600);
+  res.end(JSON.stringify([[10, 11, 12, 13, 14, 0], [11, 12, 13, 14, 15, 0], [9, 10, 11, 12, 13, 0], [10.5, 11.5, 12.5, 13.5, 14.5, 0], [100, 200, 300, 400, 500, 600], t]));
+});
+await new Promise((r) => stocknow.listen(0, "127.0.0.1", r));
+process.env.QT_STOCKNOW_URL = `http://127.0.0.1:${stocknow.address().port}/api`;
 const dse = await import("../lib/dse.js");
 
 test("a share's bars merge the files, prefer the share file, and skip no-trade days", async () => {
@@ -49,12 +61,12 @@ test("DSEX days missing from the files are chained from the median share return,
   assert.doesNotMatch((await dse.candles("DS30", "1D", 100)).notes.join(" "), /estimated/);
 });
 
-test("weekly bars are built from the daily ones, intraday is refused", async () => {
+test("weekly bars are built from the daily ones, intraday other than hourly is refused", async () => {
   const w = await dse.candles("ABC", "1W", 100);
   // 1 Nov 2026 is a Sunday: the Sunday-to-Thursday week holds all three days, and starts on that Sunday.
   assert.equal(w.candles.length, 1);
   assert.equal(w.candles[0].time, Date.UTC(2026, 10, 1) / 1000);
-  await assert.rejects(dse.candles("ABC", "1h", 10), /daily/);
+  await assert.rejects(dse.candles("ABC", "5m", 10), /hourly bars/);
 });
 
 test("an unknown code is a 404 that names it", async () => {
@@ -104,3 +116,25 @@ test("adjusted candles divide earlier prices by the ratio and never touch the ra
   assert.equal(none.adjustedApplied, 0);
   assert.match(none.notes.join(" "), /no bonus, rights or split/);
 });
+
+test("hourly charts come from StockNow: columns become bars, bad rows are dropped, and results are cached", async () => {
+  const r = await dse.candles("ABC", "1h", 100);
+  assert.equal(r.provider, "StockNow hourly");
+  assert.equal(r.candles.length, 5, "the 6th row has a zero price, so it is not a bar");
+  assert.deepEqual(r.candles[0], { time: T0, open: 10, high: 11, low: 9, close: 10.5, volume: 100 });
+  const before = hourlyHits;
+  await dse.candles("ABC", "1h", 100);
+  assert.equal(hourlyHits, before, "the second call is served from the minute's cache");
+  const two = await dse.candles("ABC", "2h", 100);
+  assert.ok(two.candles.length < 5 && two.candles.length >= 2, "2h bars are built from the hourly ones");
+  await assert.rejects(dse.candles("DSEX", "1h", 10), /daily bars only/);
+  await assert.rejects(dse.candles("ABC", "15m", 10), /hourly bars \(1h, 2h, 4h\)/);
+});
+
+test("parseHourly refuses a reply that is not the six columns", () => {
+  assert.throws(() => dse.parseHourly({ error: "x" }), /unexpected hourly reply/);
+  assert.throws(() => dse.parseHourly([[1], [1]]), /unexpected hourly reply/);
+  assert.deepEqual(dse.parseHourly([[], [], [], [], [], []]), []);
+});
+
+test.after(() => stocknow.close());

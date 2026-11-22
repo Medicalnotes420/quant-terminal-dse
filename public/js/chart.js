@@ -64,6 +64,7 @@ const ICON = {
   max: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
   restore: '<svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>',
 };
+const PATTERN_SHORT = { trendline_break: "Trend break", swing_breakout: "Swing break" };
 const css = (name) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 let uidSeq = 0;
@@ -729,7 +730,9 @@ export class ChartPane {
     for (const s of this.patternSignals || []) {
       const t = Date.parse(`${s.date}T00:00:00Z`) / 1000;
       if (!(t >= bars[0].time && t < last)) continue;
-      const i = bars.findLastIndex((b) => b.time <= t);
+      // on an hourly chart the signal belongs to the last bar of its day; on daily and slower, the bar holding the day
+      const i = this.step < 86400 ? bars.findLastIndex((b) => b.time >= t && b.time < t + 86400) : bars.findLastIndex((b) => b.time <= t);
+      if (i < 0) continue;
       const key = `${i}|${s.direction}`;
       const g = groups.get(key) || { time: bars[i].time, direction: s.direction, names: [] };
       g.names.push(s.pattern);
@@ -741,8 +744,10 @@ export class ChartPane {
         time: g.time,
         position: up ? "belowBar" : "aboveBar",
         shape: up ? "arrowUp" : down ? "arrowDown" : "circle",
-        color: up ? "#089981" : down ? "#f23645" : "#9598a1",
-        text: g.names.join(", "),
+        // vivid on both themes, and short: the arrow already says which way, the text only says which signal
+        color: up ? "#19e39a" : down ? "#ff5f73" : "#aeb3c2",
+        text: g.names.map((n) => PATTERN_SHORT[n] || n).join(" + "),
+        size: 1.3,
       };
     });
   }
