@@ -1007,7 +1007,7 @@ a.card.news:hover { border-color: var(--accent); }
 table.t.heat td { text-align: center; } table.t.heat td.base { outline: 2px solid var(--gold); outline-offset: -2px; font-weight: 700; }
 .ptq-verdict.warn { color: #f7a600; }
 
-/* PTQ: its own brand, from part-timequant.com's dark appearance (globals.css, 29 Sep 2026):
+/* PTQ: its own brand, from its dark appearance (globals.css, 29 Sep 2026):
    near-black ground with rose/cyan/peach glows, glass panels, Instrument Sans with an
    Instrument Serif italic accent, Fragment Mono eyebrows, blue pill buttons. */
 .ptq-brand {

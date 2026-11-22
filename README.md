@@ -11,7 +11,7 @@ It's one small Node.js app with no dependencies. Your watchlists, drawings, aler
 **By hand.**
 
 1. Install Node.js 18 or newer from [nodejs.org](https://nodejs.org) (the LTS version is fine).
-2. Download [quant-terminal.zip](https://part-timequant.com/kit/quant-terminal.zip) from part-timequant.com, the only official source, and unzip it. To check it's the real file, run `shasum -a 256 quant-terminal.zip` and compare it with [quant-terminal-sha256.txt](https://part-timequant.com/kit/quant-terminal-sha256.txt).
+2. Use this folder as it is (it's already unpacked).
 3. In that folder, run:
 
 ```bash
@@ -153,7 +153,7 @@ Add `--listen` to either one to print alerts as they fire. Trading real money ha
 
 ## Works with PTQ
 
-If you run [PTQ](https://www.part-timequant.com/) on the same computer (`ptq serve`), Quant Terminal finds it automatically:
+If you run PTQ on the same computer (`ptq serve`), Quant Terminal finds it automatically:
 
 - **Check with PTQ** appears under every strategy tester result. It sends the rules to PTQ, which backtests them on its own engine and checks whether the result was luck: walk-forward, overfitting (PBO), deflated Sharpe and higher costs. The strategy is saved in your PTQ.
 - **The PTQ tab** shows your PTQ account, positions, armed strategies and recent orders, with a button that stops all PTQ trading.

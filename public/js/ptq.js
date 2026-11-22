@@ -37,7 +37,6 @@ function notConnected(st, tried = false) {
       <h3 class="ptq-title">Trade it <em>for real.</em></h3>
       <p class="ptq-lead">The quant checks run on your computer. PTQ takes the same rules further and trades the ones that pass through your own exchange or broker account.</p>
       <div class="ptq-actions">
-        <div class="ptq-action"><a class="btn ptq" href="${esc(st.site)}" target="_blank" rel="noopener">Trade on PTQ &#8599;</a><span>New to PTQ? Start here.</span></div>
         <div class="ptq-action"><button class="btn ptq-outline" data-ptq-retry>I already have PTQ</button><span>${tried ? "Not found. Open PTQ on this computer, then try again." : "Connect your PTQ account to this tool."}</span></div>
       </div>
     </div>
