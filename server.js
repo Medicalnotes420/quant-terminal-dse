@@ -17,6 +17,7 @@ import * as alerts from "./lib/alerts.js";
 import * as store from "./lib/store.js";
 import * as patterns from "./lib/patterns.js";
 import * as dse from "./lib/dse.js";
+import * as fundamentals from "./lib/fundamentals.js";
 import * as info from "./lib/market-info.js";
 import { registerIndicator, INDICATORS } from "./public/lib/indicators.js";
 import { conditionFn, backtest, magnifierTf } from "./public/lib/backtest.js";
@@ -245,12 +246,18 @@ async function handle(req, res) {
     if (p === "/api/search") return send(res, 200, await data.search(q.q));
     if (p === "/api/spread") return send(res, 200, await data.getSpread(q.symbol));
     if (p === "/api/dse/shares") return send(res, 200, dse.snapshot());
+    if (p === "/api/dse/details") {
+      const t = /^(?:DSE:)?([A-Z0-9-]{1,20})$/i.exec(String(q.symbol || "").trim())?.[1];
+      if (!t) throw httpError(400, "Send ?symbol=DSE:CODE");
+      const market = dse.detail(t); // 404 when the code isn't in your DSE files
+      return send(res, 200, { ...market, company: market.isIndex ? null : fundamentals.company(t) });
+    }
     if (p === "/api/patterns") return send(res, 200, await patterns.detections(q.symbol));
     if (p === "/api/candles")
       return send(
         res,
         200,
-        await data.getCandles(q.symbol, q.tf || "1D", q.limit),
+        await data.getCandles(q.symbol, q.tf || "1D", q.limit, { adjusted: q.adjusted === "1" }),
       );
     if (p === "/api/quotes")
       return send(

@@ -63,6 +63,7 @@ class App {
         },
       ],
       watchlists: DEFAULT_WATCHLISTS,
+      savedLayouts: {},
       activeWatchlist: "Main",
       drawings: {},
       settings: {},
@@ -215,6 +216,61 @@ class App {
     if (save) this.persist();
   }
 
+  // ---------- saved layouts: the chart arrangement, each chart's symbol, timeframe and indicators ----------
+  snapshotLayout() {
+    return { layout: this.state.layout, panes: this.panes.map((p) => structuredClone(p.cfg)), savedAt: Date.now() };
+  }
+  applyLayout(saved) {
+    while (this.panes.length) this.panes.pop().destroy();
+    $("#grid").innerHTML = "";
+    this.active = null;
+    this.state.panes = structuredClone(saved.panes);
+    this.setLayout(saved.layout);
+  }
+  openLayoutsDialog() {
+    const lay = (this.state.savedLayouts ||= {});
+    const card = this.modal(
+      "Chart layouts",
+      `<div class="row-flex"><input class="in" id="lyName" placeholder="Name this layout" style="flex:1"><button class="btn primary" id="lySave">Save current</button></div>
+       <div id="lyList" style="margin-top:10px"></div>
+       <div class="hint-text" style="margin-top:8px">Loading a layout replaces the one on screen; the current one is kept as "Previous" first.</div>`,
+    );
+    const draw = () => {
+      const names = Object.keys(lay);
+      card.querySelector("#lyList").innerHTML = names.length
+        ? names.map((n) => `<div class="row-flex" data-n="${esc(n)}" style="padding:4px 0;border-bottom:1px solid var(--border)"><b style="flex:1">${esc(n)}</b><span class="muted">${lay[n].panes.length} chart${lay[n].panes.length > 1 ? "s" : ""} · ${new Date(lay[n].savedAt).toLocaleDateString()}</span><button class="btn small" data-act="load">Load</button><button class="btn small danger" data-act="del">Delete</button></div>`).join("")
+        : '<div class="hint-text">Nothing saved yet.</div>';
+    };
+    draw();
+    card.querySelector("#lySave").onclick = () => {
+      const n = card.querySelector("#lyName").value.trim();
+      if (!n) return this.toast("Give the layout a name.");
+      if (lay[n] && !confirm(`Replace the saved layout "${n}"?`)) return;
+      lay[n] = this.snapshotLayout();
+      this.persist();
+      this.toast(`Saved "${n}".`);
+      card.querySelector("#lyName").value = "";
+      draw();
+    };
+    card.querySelector("#lyList").onclick = (e) => {
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      const n = e.target.closest("[data-n]")?.dataset.n;
+      if (!act || !lay[n]) return;
+      if (act === "del") {
+        if (!confirm(`Delete the saved layout "${n}"? This can't be undone.`)) return;
+        delete lay[n];
+        this.persist();
+        return draw();
+      }
+      if (!confirm(`Load "${n}"? The layout on screen is kept as "Previous".`)) return;
+      const target = lay[n]; // taken first: loading "Previous" must not read the copy just made
+      lay.Previous = this.snapshotLayout();
+      this.applyLayout(target);
+      this.persist();
+      this.closeModal();
+    };
+  }
+
   // The buttons in a chart's top-right corner: fill the window, and close this chart.
   updatePaneActions() {
     const many = this.panes.length > 1;
@@ -316,10 +372,25 @@ class App {
     };
     $("#replayBtn").onclick = () => {
       if (this.active.replay) return this.active.stopReplay();
+      if (this.active.adjustedApplied) return this.toast("Prices are adjusted on this chart. Turn Adjusted off to replay: paper trades must use the prices that traded.", "err");
       this.setTool("replay-pick");
       this.toast("Click the bar you want replay to start from.");
     };
     $("#alertBtn").onclick = () => this.panels.openAlertDialog();
+    $("#adjBtn").onclick = () => {
+      this.active.cfg.adjusted = !this.active.cfg.adjusted;
+      this.active.load({ keepView: true });
+      this.syncToolbar();
+      this.persist();
+    };
+    $("#detailsBtn").onclick = () => this.panels.showSide("details");
+    $("#marksBtn").onclick = () => {
+      this.active.cfg.marks = this.active.cfg.marks === false; // on by default
+      this.active.render(false);
+      this.syncToolbar();
+      this.persist();
+    };
+    $("#saveBtn").onclick = () => this.openLayoutsDialog();
     $("#patBtn").onclick = () => {
       this.active.cfg.patterns = !this.active.cfg.patterns;
       this.active.loadPatterns();
@@ -366,6 +437,8 @@ class App {
     $("#chartType").value = p.cfg.type;
     $("#logBtn").classList.toggle("on", !!p.cfg.log);
     $("#patBtn").classList.toggle("on", !!p.cfg.patterns);
+    $("#marksBtn").classList.toggle("on", p.cfg.marks !== false);
+    $("#adjBtn").classList.toggle("on", !!p.cfg.adjusted);
     $("#replayBtn").classList.toggle("on", !!p.replay);
   }
 

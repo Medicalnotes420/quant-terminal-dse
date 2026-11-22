@@ -25,10 +25,10 @@ export const api = {
   put: (u, b) => req("PUT", u, b ?? {}),
   patch: (u, b) => req("PATCH", u, b ?? {}),
   del: (u) => req("DELETE", u),
-  candles: (symbol, tf, limit = 3000) =>
+  candles: (symbol, tf, limit = 3000, adjusted = false) =>
     req(
       "GET",
-      `/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}&limit=${limit}`,
+      `/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}&limit=${limit}${adjusted ? "&adjusted=1" : ""}`,
     ),
   dseShares: () => req("GET", "/api/dse/shares"),
   patterns: (symbol) => req("GET", `/api/patterns?symbol=${encodeURIComponent(symbol)}`),

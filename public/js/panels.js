@@ -250,6 +250,7 @@ export function initPanels(app) {
     ({
       watchlist: renderWatchlist,
       shares: renderShares,
+      details: renderDetails,
       alerts: renderAlerts,
       calendar: renderCalendar,
       news: () => renderNews(side, app),
@@ -362,16 +363,19 @@ export function initPanels(app) {
   // Every DSE share with its last close and change, sorted and searched here. The star adds a share to, or
   // takes it off, the Favorites list that is open (the same list as the Favorites tab).
   const COMPACT = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
-  let shareRows = null, shareSort = { key: "ticker", dir: 1 }, shareQ = "";
+  let shareRows = null, shareSort = { key: "ticker", dir: 1 }, shareQ = "", shareCat = "", shareSec = "";
   async function renderShares() {
     side.innerHTML = `<div class="wl-head"><span class="hint-text" id="shNote">Loading…</span></div>
       <div style="padding:8px"><input class="in" id="shQ" placeholder="Search shares" style="width:100%" value="${esc(shareQ)}"></div>
+      <div class="sh-filters"><label>Category<select class="in" id="shCat"></select></label><label>Sector<select class="in" id="shSec"></select></label></div>
       <div class="sh-head">${[["ticker", "Share"], ["price", "Last"], ["changePct", "Change"], ["volume", "Volume"]].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join("")}</div>
       <div id="shRows"></div>`;
     $("#shQ").oninput = (e) => {
       shareQ = e.target.value.trim().toUpperCase();
       drawShares();
     };
+    $("#shCat").onchange = (e) => ((shareCat = e.target.value), drawShares());
+    $("#shSec").onchange = (e) => ((shareSec = e.target.value), drawShares());
     $(".sh-head").onclick = (e) => {
       const k = e.target.dataset.k;
       if (!k) return;
@@ -404,14 +408,60 @@ export function initPanels(app) {
     const box = $("#shRows");
     if (!box || !shareRows) return;
     const { key, dir } = shareSort, mine = new Set(wlSymbols()), cur = app.active?.cfg.symbol;
+    // the filter lists come from the data, so a category or sector that is not there is never offered
+    const opts = (field, cur) => `<option value="">All</option>${[...new Set(shareRows.map((r) => r[field]).filter(Boolean))].sort().map((v) => `<option ${v === cur ? "selected" : ""}>${esc(v)}</option>`).join("")}`;
+    if (!$("#shCat").options.length) {
+      $("#shCat").innerHTML = opts("category", shareCat);
+      $("#shSec").innerHTML = opts("sector", shareSec);
+    }
     const rows = shareRows
       .filter((r) => !shareQ || r.ticker.includes(shareQ))
+      .filter((r) => !shareCat || r.category === shareCat)
+      .filter((r) => !shareSec || r.sector === shareSec)
       .sort((a, b) => (key === "ticker" ? (a.ticker < b.ticker ? -1 : 1) * dir : ((a[key] ?? -Infinity) - (b[key] ?? -Infinity)) * dir));
     $("#shNote").textContent = `${rows.length} of ${shareRows.length} shares · last close ${shareRows[0]?.date || ""} · star = ${app.state.activeWatchlist}`;
     document.querySelectorAll(".sh-head button").forEach((b) => b.classList.toggle("on", b.dataset.k === key));
     box.innerHTML = rows
-      .map((r) => `<div class="wl-row sh-row ${r.symbol === cur ? "current" : ""}" data-sym="${esc(r.symbol)}"><span class="sh-name"><button class="star ${mine.has(r.symbol) ? "on" : ""}" title="${mine.has(r.symbol) ? "Remove from" : "Add to"} Favorites">${mine.has(r.symbol) ? "★" : "☆"}</button><span class="sym">${esc(r.ticker)}</span></span><span class="px">${fmtPrice(r.price)}</span><span class="chg ${r.changePct >= 0 ? "up" : "down"}">${fmtPct(r.changePct)}</span><span class="vol">${COMPACT.format(r.volume)}</span></div>`)
+      .map((r) => `<div class="wl-row sh-row ${r.symbol === cur ? "current" : ""}" data-sym="${esc(r.symbol)}" title="${esc([r.name, r.sector, r.category && `Category ${r.category}`].filter(Boolean).join(" · "))}"><span class="sh-name"><button class="star ${mine.has(r.symbol) ? "on" : ""}" title="${mine.has(r.symbol) ? "Remove from" : "Add to"} Favorites">${mine.has(r.symbol) ? "★" : "☆"}</button><span class="sym">${esc(r.ticker)}</span></span><span class="px">${fmtPrice(r.price)}</span><span class="chg ${r.changePct >= 0 ? "up" : "down"}">${fmtPct(r.changePct)}</span><span class="vol">${COMPACT.format(r.volume)}</span></div>`)
       .join("") || '<div class="pad hint-text">No share matches.</div>';
+  }
+
+  // ======================= DETAILS =======================
+  // The chart's share: today's numbers from your day-end files, and company facts from the weekly snapshot.
+  async function renderDetails() {
+    const sym = app.active?.cfg.symbol || "";
+    side.innerHTML = '<div class="pad hint-text">Loading…</div>';
+    let d;
+    try {
+      d = await api.get(`/api/dse/details?symbol=${encodeURIComponent(sym)}`);
+    } catch (err) {
+      if (sideTab === "details") side.innerHTML = `<div class="pad hint-text">${esc(err.message)}</div>`;
+      return;
+    }
+    if (sideTab !== "details" || app.active?.cfg.symbol !== sym) return; // the user moved on
+    const c = d.company, n = (v, dp = 2) => (v == null || !Number.isFinite(+v) ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: dp }));
+    const row = (k, v, cls = "") => `<div class="dt-row"><span>${esc(k)}</span><span class="${cls}">${v}</span></div>`;
+    const dir = d.changePct >= 0 ? "up" : "down";
+    let h = `<div class="dt-head"><b>${esc(d.ticker)}</b>${c ? ` <span class="muted">${esc(c.name || "")}</span>` : ""}<div class="muted">${c ? [c.sector, c.category && `Category ${c.category}`, c.settlement && `settles ${c.settlement}`].filter(Boolean).map(esc).join(" · ") : d.isIndex ? "Index" : "Not in the company snapshot"}</div></div>`;
+    h += `<div class="dt-sec">Last session, ${esc(d.date)}</div>`
+      + row("Close", `<b>${fmtPrice(d.close)}</b>`)
+      + row("Change", `${n(d.change)} (${fmtPct(d.changePct)})`, dir)
+      + row("Open", fmtPrice(d.open)) + row("High", fmtPrice(d.high)) + row("Low", fmtPrice(d.low)) + row("Previous close", fmtPrice(d.prevClose))
+      + row("Volume", n(d.volume, 0)) + (d.valueMn != null ? row("Value (Tk million)", n(d.valueMn)) : "")
+      + row(`Range since ${d.since}`, `${fmtPrice(d.rangeLow)} – ${fmtPrice(d.rangeHigh)}`);
+    if (c) {
+      const eps = c.eps?.eps, nav = c.eps?.nav;
+      h += `<div class="dt-sec">Company, snapshot of ${esc(c.snapshotDay)}</div>`
+        + row("Board", esc(c.board ?? "—")) + row("Listed", esc(c.listingYear ?? "—")) + row("Financial year ends", esc(c.yearEnd ?? "—")) + row("AGM", esc(c.agmDate ?? "—"))
+        + row("Face value", n(c.faceValue)) + row("Paid-up capital (Tk)", n(c.paidUpCapital, 0)) + row("Shares", n(c.shares, 0)) + row("Free float %", n(c.freeFloat))
+        + row("Market cap at last close (Tk)", c.shares ? n(c.shares * d.close, 0) : "—")
+        + row(`EPS ${c.eps?.year ?? ""}`, n(eps), eps < 0 ? "down" : "") + row("NAV per share", n(nav))
+        + row("P/E at last close", eps > 0 ? n(d.close / eps) : eps == null ? "—" : "n/a (loss)") + row("P/B at last close", nav > 0 ? n(d.close / nav) : "—");
+      if (c.dividends.length) h += `<div class="dt-sec">Dividends</div>` + c.dividends.map((x) => row(String(x.year), `cash ${n(x.cash)} · stock ${n(x.stock)}`)).join("");
+      if (c.news.length)
+        h += `<div class="dt-sec">News</div>` + c.news.map((x) => `<details class="dt-news"><summary>${esc(x.summary || x.type)} <span class="muted">${esc(x.date)}</span></summary><p>${esc(x.body || "No text.")}</p></details>`).join("");
+    }
+    side.innerHTML = h;
   }
 
   // ======================= ALERTS =======================
@@ -801,6 +851,7 @@ export function initPanels(app) {
   }
 
   async function runTester() {
+    if (app.active?.adjustedApplied) return app.toast("Prices are adjusted on this chart. Turn Adjusted off to run the tester: it must use the prices that traded.", "err");
     const p = app.active;
     if (!p?.bars.length)
       return app.toast("The active chart has no data yet.", "err");
@@ -1715,6 +1766,7 @@ export function initPanels(app) {
 
   // ---------- hooks for the app ----------
   P.showBottom = showBottom;
+  P.showSide = showSide;
   P.openAlertDialog = openAlertDialog;
   let lastSymbol = null;
   P.onActiveChange = () => {
@@ -1723,6 +1775,7 @@ export function initPanels(app) {
     if (sym !== lastSymbol) {
       lastSymbol = sym;
       if (sideTab === "news") renderNews(side, app);
+      if (sideTab === "details") renderDetails();
       if (!bottomEl.classList.contains("collapsed") && bottomTab === "seasonals") renderSeasonals(bottom, app);
       if (!bottomEl.classList.contains("collapsed") && bottomTab === "financials") renderFinancials(bottom, app);
     }

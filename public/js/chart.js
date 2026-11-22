@@ -383,13 +383,14 @@ export class ChartPane {
     this.showMsg(`Loading ${ticker(this.cfg.symbol)}…`);
     try {
       const limit = this.app.settings.bars || 3000;
-      const r = await api.candles(this.cfg.symbol, this.cfg.tf, limit);
+      const r = await api.candles(this.cfg.symbol, this.cfg.tf, limit, !!this.cfg.adjusted);
       if (token !== this.loadToken) return;
       this.cfg.symbol = r.symbol;
       this.provider = r.provider;
       this.notes = r.notes || [];
       this.bars = r.candles;
       this.mtf = {};
+      this.adjustedApplied = (r.adjustedApplied || 0) > 0; // true: these bars are not the prices that traded
       this.patternSignals = [];
       this.replay = null;
       this.el.querySelector(".replay-bar")?.remove();
@@ -702,7 +703,7 @@ export class ChartPane {
     // a maximized lower pane takes the chart; the others shrink to a strip
     this.chart.panes().forEach((p, i) => p.setStretchFactor(big < 0 ? (i === 0 ? 1 : 0.28) : i === big ? 1 : 0.02));
     requestAnimationFrame(() => this.positionPaneTools());
-    const all = [...markers, ...this.extraMarkers, ...(this.cfg.patterns ? this.patternMarkers() : [])]
+    const all = (this.cfg.marks === false ? [] : [...markers, ...this.extraMarkers, ...(this.cfg.patterns ? this.patternMarkers() : [])])
       .map((m) => ({ ...m, time: this.toChart(m.time) }))
       .filter((m) => !this.replay || m.time <= this.times.at(-1));
     all.sort((x, y) => x.time - y.time);
@@ -1140,6 +1141,7 @@ export class ChartPane {
 
   // ---------- bar replay ----------
   startReplay(index) {
+    if (this.adjustedApplied) return this.app.toast("Prices are adjusted on this chart. Turn Adjusted off to replay: paper trades must use the prices that traded.", "err");
     this.stopLive();
     this.replay = {
       index: Math.max(1, Math.min(index, this.bars.length - 1)),

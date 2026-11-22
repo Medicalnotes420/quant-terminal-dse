@@ -7,6 +7,9 @@ import path from "node:path";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qt-dse-"));
 process.env.QT_DSE_DIR = dir;
 process.env.QT_DSE_WORKER = "off";
+process.env.QT_FUND_DIR = path.join(dir, "no-fundamentals"); // none: the tests below use their own
+fs.writeFileSync(path.join(dir, "actions.csv"), "ticker,date,ratio\nABC,2026-11-02,2\n");
+process.env.QT_DSE_ACTIONS = path.join(dir, "actions.csv");
 const H = "date,ticker,open,high,low,close,trades,value_mn,volume\n";
 // ABC is in both files with different closes on 2026-11-02: the share-specific file must win.
 // 2026-11-03 has zero trades (DSE repeats the close): it is not a bar.
@@ -73,4 +76,31 @@ test("snapshot lists each share's last close and day change, and leaves stopped 
   assert.equal(abc.date, "2026-11-04");
   assert.ok(s.every((r) => !r.ticker.startsWith("DSE")), "indexes are not shares");
   assert.deepEqual(s.map((r) => r.ticker), [...s.map((r) => r.ticker)].sort());
+});
+
+test("detail gives the last bar, the day change and the range since the first bar", () => {
+  const d = dse.detail("abc");
+  assert.equal(d.symbol, "DSE:ABC");
+  assert.equal(d.close, 12);
+  assert.equal(d.prevClose, 11);
+  assert.equal(d.rangeHigh, 13);
+  assert.equal(d.rangeLow, 9);
+  assert.equal(d.since, "2026-11-01");
+  assert.equal(d.trades, undefined, "the trade count is not shown: StockNow writes 1 for it");
+  assert.equal(d.valueMn, 1);
+  assert.equal(dse.detail("DSEX").isIndex, true);
+  assert.throws(() => dse.detail("NOPE"), /isn't in your DSE files/);
+});
+
+test("adjusted candles divide earlier prices by the ratio and never touch the raw bars", async () => {
+  const adj = await dse.candles("ABC", "1D", 100, { adjusted: true });
+  assert.deepEqual(adj.candles.map((b) => b.close), [5.25, 11, 12]);
+  assert.equal(adj.adjustedApplied, 1);
+  assert.match(adj.notes.join(" "), /adjusted for 1 bonus/);
+  const raw = await dse.candles("ABC", "1D", 100);
+  assert.deepEqual(raw.candles.map((b) => b.close), [10.5, 11, 12]);
+  assert.equal(raw.adjustedApplied, 0);
+  const none = await dse.candles("XYZ", "1D", 100, { adjusted: true });
+  assert.equal(none.adjustedApplied, 0);
+  assert.match(none.notes.join(" "), /no bonus, rights or split/);
 });

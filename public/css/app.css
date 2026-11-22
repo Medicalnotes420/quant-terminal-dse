@@ -1026,3 +1026,15 @@ table.t.heat td { text-align: center; } table.t.heat td.base { outline: 2px soli
 .sh-row .vol { color: var(--muted); }
 .wl-row .star { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 4px 0 0; font-size: 14px; line-height: 1; }
 .wl-row .star.on, .wl-row .star:hover { color: #f7a600; }
+
+/* filters and the Details tab */
+.sh-filters { display: flex; gap: 6px; padding: 0 8px 6px; font-size: 11px; color: var(--muted); }
+.sh-filters label { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dt-head { padding: 10px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.dt-head .muted { font-size: 11px; font-weight: 400; }
+.dt-sec { padding: 8px 10px 3px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.dt-row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 10px; font-size: 12px; font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--border); }
+.dt-row span:first-child { color: var(--muted); }
+.dt-news { padding: 4px 10px; font-size: 12px; border-bottom: 1px solid var(--border); }
+.dt-news summary { cursor: pointer; }
+.dt-news p { margin: 4px 0; color: var(--muted); }
