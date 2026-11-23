@@ -1,6 +1,7 @@
-// A closer look at the Double Bottom alone, the one pattern that showed a signal in scripts/backtest-patterns.mjs.
+// A closer look at one pattern alone. The default is Double Bottom, the one that showed a signal in scripts/backtest-patterns.mjs;
+// pass another name, such as "Triangle" or "Triple Bottom", as the first argument.
 //
-//   node scripts/backtest-double-bottom.mjs      writes docs/double-bottom-backtest.html and .json
+//   node scripts/backtest-double-bottom.mjs [pattern]   writes docs/<pattern>-backtest.html and .json
 //
 // Read this first: Double Bottom was picked because it looked best in the all-patterns run, on this same data. That makes
 // every number here friendlier than a fresh test would give. Nothing below is tuned: the variants are a fixed list that
@@ -20,7 +21,7 @@ import * as dse from "../lib/dse.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const A2 = "../../Stockapp/data/raw/a2/x/Dhaka Stock Exchange End-of-Day Financial Dataset";
-const HOLD = 60, TPLUS = 2, LIQUID = 5e6, CONTROL = 20, HOLDOUT = Date.UTC(2026, 0, 25) / 1000, TYPE = "Double Bottom";
+const HOLD = 60, TPLUS = 2, LIQUID = 5e6, CONTROL = 20, HOLDOUT = Date.UTC(2026, 0, 25) / 1000, TYPE = process.argv[2] || "Double Bottom", SLUG = TYPE.toLowerCase().replace(/[^a-z]+/g, "-"), WINNER = TYPE === "Double Bottom"; // node scripts/backtest-double-bottom.mjs "Triple Bottom"
 const csv = (f) => fs.readFileSync(f, "utf8").replace(/^﻿/, "").trim().split(/\r?\n/).slice(1).map((l) => l.split(","));
 const equities = csv(`${A2}/metadata/company_metadata.csv`).filter((r) => r[1] === "Equity").map((r) => r[0].trim());
 const iso = (t) => new Date(t * 1000).toISOString().slice(0, 10);
@@ -203,7 +204,7 @@ function portfolio(rows, vid) {
 const port = portfolio(liq, "open");
 
 const result = { shares, patterns, trades: trades.length, liquidTrades: liq.length, variants: variantTable, byYear, splits, portfolio: port };
-fs.writeFileSync(path.join(here, "../docs/double-bottom-backtest.json"), JSON.stringify(result, null, 1));
+fs.writeFileSync(path.join(here, `../docs/${SLUG}-backtest.json`), JSON.stringify(result, null, 1));
 
 // ---------- report ----------
 const pct = (x, d = 1) => (Number.isFinite(x) ? `${(x * 100).toFixed(d)}%` : "n/a");
@@ -223,20 +224,20 @@ const table = (head, rows) => `<table><thead><tr>${head.map((h) => `<th>${h}</th
 const srow = (label, s) => [label, s.n, pct(s.target), pct(s.stop), pct(s.time), pct(s.win), sign(s.net), sign(s.control), sign(s.edge), `${sign(s.lo)} to ${sign(s.hi)}`];
 const H = ["", "Trades", "Target", "Stop", "Timed out", "Winners", "Avg result", "Random days", "Edge", "95% range"];
 const base = variantTable[1].liquid;
-const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Double Bottom backtest</title>
+const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${TYPE} backtest</title>
 <style>:root{--bg:#fff;--fg:#1c2230;--mut:#5d6677;--card:#f4f6fa;--line:#d9dee8;--good:#00875a;--bad:#c8102e}@media(prefers-color-scheme:dark){:root{--bg:#0f131b;--fg:#e6e9f0;--mut:#9aa3b5;--card:#171c27;--line:#2a3142;--good:#19e39a;--bad:#ff5f73}}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,Segoe UI,sans-serif}main{max-width:900px;margin:0 auto;padding:24px 16px 60px}h1{font-size:24px}h2{font-size:18px;margin-top:34px}
 .k{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.k div{background:var(--card);border-radius:8px;padding:10px 12px}.k b{display:block;font-size:20px}.k span{color:var(--mut);font-size:12px}
 figure{margin:18px 0;background:var(--card);border-radius:8px;padding:12px}figcaption span{color:var(--mut);font-size:13px}svg{width:100%;height:auto;color:var(--fg)}table{border-collapse:collapse;width:100%;font-size:13px;display:block;overflow-x:auto}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}thead th{color:var(--mut);font-weight:600}.n{color:var(--mut);font-size:13px}.w{background:var(--card);border-left:4px solid var(--bad);padding:10px 14px;border-radius:6px}</style>
-<main><h1>Double Bottom on its own</h1>
-<p class="w"><b>Read this first.</b> The Double Bottom was chosen because it looked best in the run of all patterns, on this same data. Every number here is friendlier than a fresh test would be. The only pre-set cut is "liquid" (median turnover of at least BDT ${LIQUID / 1e6} million).</p>
-<div class="k"><div><b>${trades.length.toLocaleString()}</b><span>Double Bottom trades (${liq.length.toLocaleString()} liquid)</span></div><div><b>${sign(base.net)}</b><span>avg result, liquid, next open, 0.30% costs</span></div><div><b>${sign(base.edge)}</b><span>over random days (${sign(base.lo)} to ${sign(base.hi)})</span></div><div><b>${pct(port.cagr)}</b><span>portfolio a year, against ${pct(port.dsexCagr)} for the DSEX</span></div></div>
-<h2>Does it survive realistic fills and costs?</h2><p>The same Double Bottom trades, filled four ways. The all-patterns run bought at the breakout close, which is the price you only know after the market has shut.</p>
+<main><h1>${TYPE} on its own</h1>
+<p class="w"><b>Read this first.</b> ${WINNER ? "The Double Bottom was chosen because it looked best in the run of all patterns, on this same data. Every number here is friendlier than a fresh test would be." : `The ${TYPE} was chosen because it showed no edge in the run of all patterns, on this same data, so a poor result here is no surprise and a good one would deserve extra doubt.`} The only pre-set cut is "liquid" (median turnover of at least BDT ${LIQUID / 1e6} million).</p>
+<div class="k"><div><b>${trades.length.toLocaleString()}</b><span>${TYPE} trades (${liq.length.toLocaleString()} liquid)</span></div><div><b>${sign(base.net)}</b><span>avg result, liquid, next open, 0.30% costs</span></div><div><b>${sign(base.edge)}</b><span>over random days (${sign(base.lo)} to ${sign(base.hi)})</span></div><div><b>${pct(port.cagr)}</b><span>portfolio a year, against ${pct(port.dsexCagr)} for the DSEX</span></div></div>
+<h2>Does it survive realistic fills and costs?</h2><p>The same ${TYPE} trades, filled four ways. The all-patterns run bought at the breakout close, which is the price you only know after the market has shut.</p>
 ${chart(variantTable.map((v) => ({ label: v.label, n: v.liquid.n, edge: v.liquid.edge, lo: v.liquid.lo, hi: v.liquid.hi })), "edge", "Edge over random days, liquid shares", "Right of the centre line means better than the same stop and target on random days.")}
 ${table(H, variantTable.flatMap((v) => [srow(`${v.label} (liquid)`, v.liquid), srow(`${v.label} (all shares)`, v.all)]))}
 <h2>Year by year (liquid, next open, 0.30%)</h2>${chart(byYear.map((y) => ({ label: String(y.y), n: y.n, edge: y.edge, lo: y.lo, hi: y.hi })), "edge", "Edge by year", "A real edge shows up most years, not only in a few.")}
 ${table(["Year", ...H.slice(1)], byYear.map((y) => srow(String(y.y), y)))}
-<h2>Which Double Bottoms work?</h2>${chart(splits.map((s) => ({ label: s.label, n: s.n, edge: s.edge, lo: s.lo, hi: s.hi })), "edge", "Edge by group (liquid, next open, 0.30%)", "Descriptive only: these groups were not chosen in advance, so do not pick the best one and trade it.")}
+<h2>Which ${TYPE} trades work?</h2>${chart(splits.map((s) => ({ label: s.label, n: s.n, edge: s.edge, lo: s.lo, hi: s.hi })), "edge", "Edge by group (liquid, next open, 0.30%)", "Descriptive only: these groups were not chosen in advance, so do not pick the best one and trade it.")}
 ${table(H, splits.map((s) => srow(s.label, s)))}
 <h2>As a portfolio</h2><p>Liquid trades bought at the next open from ${port.from} to ${port.to}: at most 10 open at once, one per share, each 10% of the account when bought. ${port.taken} trades were taken and ${port.skipped} skipped because 10 were already open or the share was already held.</p>
 <div class="k"><div><b>${(port.final / 100).toFixed(2)}x</b><span>account over ${port.years.toFixed(1)} years</span></div><div><b>${pct(port.cagr)}</b><span>a year</span></div><div><b>${pct(port.maxDD)}</b><span>worst drop (on sold trades only)</span></div><div><b>${pct(port.dsexCagr)}</b><span>DSEX a year (price index, no dividends)</span></div></div>
@@ -246,9 +247,9 @@ ${chart(port.byYear.map((y) => ({ label: String(y.y), n: "", edge: y.r })), "edg
 <li><b>Fills:</b> a buy at the next open assumes enough sellers at that price. Circuit limits, the 2020 floor-price period, queues and taxes are not modelled. The 0.80% and 1.30% rows show how fast a thin edge disappears.</li>
 <li><b>Overlap:</b> the portfolio drawdown only moves when a trade is sold, so the true worst drop was deeper.</li></ul>
 <p class="n">Script: scripts/backtest-double-bottom.mjs. Same data as the all-patterns report.</p></main></html>`;
-fs.writeFileSync(path.join(here, "../docs/double-bottom-backtest.html"), html);
+fs.writeFileSync(path.join(here, `../docs/${SLUG}-backtest.html`), html);
 
-console.log(`shares ${shares}, double bottoms found ${patterns}, traded ${trades.length} (${liq.length} liquid)`);
+console.log(`${TYPE}: shares ${shares}, patterns found ${patterns}, traded ${trades.length} (${liq.length} liquid)`);
 for (const v of variantTable) for (const k of ["liquid", "all"]) { const s = v[k]; console.log(`${v.id.padEnd(7)} ${k.padEnd(6)} n=${s.n} tgt ${pct(s.target)} stop ${pct(s.stop)} win ${pct(s.win)} net ${sign(s.net)} ctl ${sign(s.control)} edge ${sign(s.edge)} [${sign(s.lo)}, ${sign(s.hi)}]`); }
 for (const y of byYear) console.log(y.y, `n=${y.n}`, `net ${sign(y.net)} edge ${sign(y.edge)} [${sign(y.lo)}, ${sign(y.hi)}]`);
 for (const s of splits) console.log(s.label.padEnd(42), `n=${s.n}`, `net ${sign(s.net)} edge ${sign(s.edge)} [${sign(s.lo)}, ${sign(s.hi)}]`);
