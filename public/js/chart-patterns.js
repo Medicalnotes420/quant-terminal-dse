@@ -187,7 +187,8 @@ export class ChartPatterns {
           ctx.lineTo(size.width, y);
           ctx.stroke();
           ctx.setLineDash([]);
-          g.pills.push(this.label(ctx, `${text} ${price.toFixed(2)}`, size.width - 120, y, col, pal, taken, size));
+          // not a hit target: these sit at the right edge, and a click there must let go of the pattern like any empty spot
+          this.label(ctx, `${text} ${price.toFixed(2)}`, size.width - 120, y, col, pal, taken, size);
         }
       }
       this.geom.push(g);

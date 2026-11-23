@@ -1820,6 +1820,7 @@ export function initPanels(app) {
   let lastSymbol = null;
   P.onActiveChange = () => {
     if (sideTab === "watchlist") drawRows();
+    if (sideTab === "patterns") renderPatternsTab();
     const sym = app.active?.cfg.symbol;
     if (sym !== lastSymbol) {
       lastSymbol = sym;

@@ -698,7 +698,8 @@ export class ChartPane {
       if (res.chartPatterns) {
         // bar-index patterns only make sense on real bars: Renko, Kagi, Line break, Range, Point & figure and Heikin Ashi are rebuilt
         if (["renko", "linebreak", "range", "kagi", "pnf", "heikin"].includes(this.cfg.type)) res.error = "Not drawn on this chart type: use candles, bars or a line";
-        else if (!this.patternPrim) {
+        else if (this.patternPrim) res.error = "Only the first All Chart Patterns indicator on a chart is drawn";
+        else {
           // the first All Chart Patterns indicator on the chart drives the list, the selection and the switches
           const hidden = new Set(ind.hiddenPatterns || []);
           this.patternList = res.chartPatterns.map((p) => ({ ...p, key: this.patternKey(p, bars) }));
@@ -981,7 +982,10 @@ export class ChartPane {
     const pill = g?.pills[0];
     const ax = this.tipAt?.x ?? (pill ? pill.x + 12 : 80), ay = this.tipAt?.y ?? (pill ? pill.y + 26 : 80);
     const w = el.offsetWidth || 230, h = el.offsetHeight || 190;
-    el.style.left = `${Math.max(6, Math.min(r.width - w - 70, ax + 14))}px`;
+    // right of the click, or left of it when there is no room before the price scale; always inside the pane
+    const plotW = this.chart.timeScale().width();
+    const left = ax + 14 + w > plotW - 6 ? ax - w - 14 : ax + 14;
+    el.style.left = `${Math.max(6, Math.min(r.width - w - 6, left))}px`;
     el.style.top = `${Math.max(6, Math.min(r.height - h - 8, ay + 14))}px`;
   }
   // Scroll and zoom so the whole pattern (its points, breakout and target line) is in view, then select it.
@@ -1228,13 +1232,16 @@ export class ChartPane {
     )
       ? 3000
       : 10000;
+    const run = (this.liveRun = {}); // stopLive() drops it, so a tick still waiting on the network can't merge or reschedule
     const tick = async () => {
       try {
         const r = await api.candles(this.cfg.symbol, this.cfg.tf, 5);
+        if (this.liveRun !== run) return;
         this.merge(r.candles);
       } catch {
         /* keep trying */
       }
+      if (this.liveRun !== run) return;
       this.liveTimer = setTimeout(tick, kind);
     };
     this.liveTimer = setTimeout(tick, kind);
@@ -1249,15 +1256,18 @@ export class ChartPane {
       this.liveOn = wasOpen;
       this.updateLegend();
     }
+    const run = (this.liveRun = {}); // stopLive() drops it, so a tick still waiting on the network can't merge or reschedule
     const tick = async () => {
       const now = Date.now(), open = isSessionOpen(now);
       if (open || wasOpen) {
         try {
           const r = await api.candles(this.cfg.symbol, this.cfg.tf, 5, !!this.cfg.adjusted);
+          if (this.liveRun !== run) return;
           this.merge(r.candles);
         } catch {
           /* keep trying */
         }
+        if (this.liveRun !== run) return;
       }
       if (open !== this.liveOn) {
         this.liveOn = open;
@@ -1272,6 +1282,7 @@ export class ChartPane {
   stopLive() {
     clearTimeout(this.liveTimer);
     this.liveTimer = null;
+    this.liveRun = null;
     this.liveOn = false;
     if (this.ws) {
       const ws = this.ws;
