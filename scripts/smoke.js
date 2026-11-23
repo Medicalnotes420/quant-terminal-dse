@@ -34,16 +34,15 @@ async function check(name, url, test) {
 await check('app page', '/', (b) => b.includes('Quant Terminal'));
 await check('chart engine', '/vendor/lightweight-charts.standalone.production.js', (b) => b.length > 100000);
 await check('health', '/api/health', (b) => b.ok === true);
-await check('crypto candles (BTCUSDT 1h)', '/api/candles?symbol=BTCUSDT&tf=1h&limit=200', (b) => b.candles?.length >= 100 && (results.cryptoVia = b.provider));
-await check('stock candles (AAPL 1D)', '/api/candles?symbol=AAPL&tf=1D&limit=200', (b) => b.candles?.length >= 100 && (results.stockVia = b.provider));
-await check('watchlist quotes', '/api/quotes?symbols=BTCUSDT,ETHUSDT', (b) => Object.values(b).every((q) => q.price > 0));
+await check('DSE index candles (DSE:DSEX 1D)', '/api/candles?symbol=DSE:DSEX&tf=1D&limit=200', (b) => b.candles?.length >= 100 && (results.dseVia = b.provider));
+await check('DSE share candles (DSE:AL-HAJTEX 1D)', '/api/candles?symbol=DSE:AL-HAJTEX&tf=1D&limit=200', (b) => b.candles?.length >= 100);
+await check('watchlist quotes', '/api/quotes?symbols=DSE:AL-HAJTEX,DSE:DSEX', (b) => Object.values(b).every((q) => q.price > 0));
 
 await fetch(`${base}/api/shutdown`, { method: 'POST', headers: { 'x-qt': '1' } }).catch(() => {});
 setTimeout(() => child.kill(), 1000).unref();
 
 for (const r of results) console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.name} (${r.ms} ms)${r.info ? `  ${r.info}` : ''}`);
-console.log(`crypto via ${results.cryptoVia || '-'}, stocks via ${results.stockVia || '-'}`);
-const required = results.filter((r) => !r.name.startsWith('stock'));
-const pass = required.every((r) => r.ok);
+console.log(`DSE via ${results.dseVia || '-'}`);
+const pass = results.every((r) => r.ok);
 console.log(pass ? '\nSMOKE TEST PASSED' : '\nSMOKE TEST FAILED');
 process.exit(pass ? 0 : 1);
