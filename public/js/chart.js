@@ -888,6 +888,8 @@ export class ChartPane {
         ? `<span class="down">${esc(res.error)}</span>`
         : res.pending
           ? '<span class="muted">loading…</span>'
+          : res.chartPatterns
+            ? `<span class="muted">${res.chartPatterns.length ? `${res.chartPatterns.length} found` : "none in these bars"}</span>`
           : def.outputs
             .map((o) => {
               const v = res[o.key]?.[i];
@@ -900,12 +902,15 @@ export class ChartPane {
         /\(([^)]+)\)$/.exec(def.name)?.[1].split(" / ")[0] || def.name;
       html += `<div class="row ind" data-uid="${ind.uid}" style="${ind.hidden ? "opacity:.45" : ""}"><span class="name">${esc(short)} ${esc(params)}</span><span class="vals">${vals}</span><span class="acts"><button data-act="settings" title="Settings">${ICON.gear}</button><button data-act="hide" title="Show/hide">${ICON.eye}</button><button data-act="remove" title="Remove">${ICON.x}</button></span></div>`;
     }
+    if (!this.cfg.indicators.some((x) => x.id === "chartpatterns"))
+      html += `<div class="row ind"><span class="name muted">Chart patterns off</span><span class="acts"><button class="btn small" data-act="addpatterns">Add</button></span></div>`;
     this.legendEl.innerHTML = html;
     this.legendEl.onclick = (e) => {
       const btn = e.target.closest("[data-act]");
       if (!btn) return;
       const act = btn.dataset.act;
       if (act === "symbol") return this.app.openSymbolSearch();
+      if (act === "addpatterns") return void this.addIndicator("chartpatterns");
       if (act === "rmcompare") {
         this.cfg.compare = this.cfg.compare.filter(
           (s) => s !== btn.closest("[data-compare]").dataset.compare,

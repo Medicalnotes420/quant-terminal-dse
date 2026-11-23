@@ -75,6 +75,15 @@ class App {
       strategies: {},
       ...state,
     };
+    // once: charts saved before the patterns indicator joined the default layout get it too (removing it later sticks)
+    if (!this.state.migrated?.patterns) {
+      const give = (cfg) => {
+        if (!cfg.indicators?.some((i) => i.id === "chartpatterns")) (cfg.indicators ||= []).push({ uid: newUid(), id: "chartpatterns", params: {} });
+      };
+      this.state.panes.forEach(give);
+      Object.values(this.state.savedLayouts || {}).forEach((l) => l.panes?.forEach(give));
+      this.state.migrated = { ...this.state.migrated, patterns: true };
+    }
     this.settings = {
       theme: "dark",
       volume: true,
