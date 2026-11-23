@@ -15,7 +15,7 @@ import {
 } from "../lib/series.js";
 import { DrawingLayer, TOOL_BY_ID } from "./drawings.js";
 import { VolumeProfile, SessionVolumeProfile } from "./volume-profile.js";
-import { ChartPatterns, patternColour } from "./chart-patterns.js";
+import { ChartPatterns, patternColour, passesFilter, patternEvents } from "./chart-patterns.js";
 
 const LW = window.LightweightCharts;
 
@@ -701,10 +701,10 @@ export class ChartPane {
         else if (this.patternPrim) res.error = "Only the first All Chart Patterns indicator on a chart is drawn";
         else {
           // the first All Chart Patterns indicator on the chart drives the list, the selection and the switches
-          const hidden = new Set(ind.hiddenPatterns || []);
           this.patternList = res.chartPatterns.map((p) => ({ ...p, key: this.patternKey(p, bars) }));
           const cp = new ChartPatterns(this, this.patternList);
-          cp.hidden = hidden;
+          cp.hidden = this.hiddenPatternSet(ind);
+          this.checkPatternAlerts(ind);
           cp.selected = this.patternList.some((p) => p.key === this.selectedPattern) ? this.selectedPattern : null;
           if (!cp.selected) this.selectedPattern = null;
           this.main.attachPrimitive(cp);
@@ -1005,6 +1005,33 @@ export class ChartPane {
     this.selectPattern(key);
     requestAnimationFrame(() => requestAnimationFrame(() => this.showPatternTip())); // after the redraw has placed the label
   }
+  // not drawn: the ones switched off by hand plus the ones the quality filter leaves out
+  hiddenPatternSet(ind) {
+    const hidden = new Set(ind.hiddenPatterns || []);
+    for (const p of this.patternList) if (!passesFilter(p, ind.patFilter)) hidden.add(p.key);
+    return hidden;
+  }
+  setPatternFilter(f) {
+    const ind = this.patternInd;
+    if (!ind) return;
+    ind.patFilter = f;
+    if (this.selectedPattern && !passesFilter(this.patternByKey(this.selectedPattern) || {}, f)) this.selectedPattern = null;
+    this.render(false);
+    this.app.persist();
+  }
+  // Tell the user when a pattern they already knew about breaks out, reaches its target or fails (opt-in per chart).
+  checkPatternAlerts(ind) {
+    const id = `${this.cfg.symbol}|${this.cfg.tf}`;
+    const prev = this.patSeen?.id === id ? this.patSeen.map : null;
+    this.patSeen = { id, map: new Map(this.patternList.map((p) => [p.key, { broke: p.breakI != null, status: p.status }])) };
+    if (!prev || !ind.patAlerts) return;
+    for (const e of patternEvents(prev, this.patternList)) this.app.patternAlert(`${ticker(this.cfg.symbol)} ${this.cfg.tf}: ${e.text}`);
+  }
+  setPatternAlerts(on) {
+    if (!this.patternInd) return;
+    this.patternInd.patAlerts = on;
+    this.app.persist();
+  }
   setPatternVisible(key, on) {
     const ind = this.patternInd;
     if (!ind) return;
@@ -1018,7 +1045,7 @@ export class ChartPane {
   setAllPatternsVisible(on) {
     const ind = this.patternInd;
     if (!ind) return;
-    ind.hiddenPatterns = on ? [] : this.patternList.map((p) => p.key);
+    ind.hiddenPatterns = on ? [] : this.patternList.filter((p) => passesFilter(p, ind.patFilter)).map((p) => p.key);
     if (!on) this.selectedPattern = null;
     this.render(false);
     this.app.persist();

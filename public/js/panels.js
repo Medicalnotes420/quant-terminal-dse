@@ -1,5 +1,5 @@
 // Side panel (watchlist, alerts, calendar) and bottom panel (tester, screener, heatmap, paper, editor).
-import { patternColour } from "./chart-patterns.js";
+import { patternColour, passesFilter } from "./chart-patterns.js";
 import {
   api,
   download,
@@ -481,12 +481,20 @@ export function initPanels(app) {
     }
     const hidden = new Set(p.patternInd.hiddenPatterns || []);
     const theme = document.documentElement.dataset.theme;
-    const list = [...p.patternList].sort((a, b) => b.points.at(-1).i - a.points.at(-1).i);
+    const f = p.patternInd.patFilter || { status: "all", minSize: 0 };
+    const all = p.patternList.length;
+    // the quality filter leaves the rest out of the list as well as off the chart
+    const list = p.patternList.filter((x) => passesFilter(x, f)).sort((a, b) => b.points.at(-1).i - a.points.at(-1).i);
+    const drawn = list.filter((x) => !hidden.has(x.key)).length;
     const day = (i) => {
       const t = p.shown[i]?.time;
       return t ? new Date(t * 1000).toISOString().slice(0, p.step < 86400 ? 16 : 10).replace("T", " ") : "";
     };
-    side.innerHTML = `<div class="wl-head"><span class="hint-text" style="flex:1">${list.length - hidden.size} of ${list.length} drawn</span><button class="btn small" id="ptAll">Show all</button><button class="btn small" id="ptNone">Hide all</button></div>
+    const opt = (v, t) => `<option value="${v}" ${f.status === v ? "selected" : ""}>${t}</option>`;
+    side.innerHTML = `<div class="wl-head"><span class="hint-text" style="flex:1">${drawn} drawn of ${all}${list.length < all ? ` (${all - list.length} filtered out)` : ""}</span><button class="btn small" id="ptAll">Show all</button><button class="btn small" id="ptNone">Hide all</button></div>
+      <div class="wl-head" style="gap:6px;flex-wrap:wrap"><select class="in" id="ptStage" title="Which patterns to keep">${opt("all", "All stages")}${opt("live", "Forming, no breakout")}${opt("broken", "Broke out, target open")}${opt("reached", "Reached target")}${opt("failed", "Failed")}</select>
+        <label class="hint-text" title="Smallest figure to keep: highest to lowest point as a % of price">min size <input class="in" id="ptSize" type="number" min="0" step="1" value="${f.minSize || 0}" style="width:56px"> %</label>
+        <label class="hint-text" title="Tell me when a pattern I can see breaks out, reaches its target or fails"><input type="checkbox" id="ptAlert" ${p.patternInd.patAlerts ? "checked" : ""}> alert me</label></div>
       <div id="ptRows" class="pt-rows">${
         list.map((x) => {
           const on = !hidden.has(x.key);
@@ -497,6 +505,13 @@ export function initPanels(app) {
             <span class="pt-st">${esc(x.status)}<small>${x.target ? `target ${esc(Number(x.target.price).toFixed(2))}` : ""}</small></span></div>`;
         }).join("") || '<div class="pad hint-text">No pattern found in these bars.</div>'
       }</div>`;
+    const setFilter = () => p.setPatternFilter({ status: $("#ptStage").value, minSize: Math.max(0, Number($("#ptSize").value) || 0) });
+    $("#ptStage").onchange = setFilter;
+    $("#ptSize").onchange = setFilter;
+    $("#ptAlert").onchange = (e) => {
+      p.setPatternAlerts(e.target.checked);
+      if (e.target.checked && "Notification" in window && Notification.permission === "default") Notification.requestPermission();
+    };
     $("#ptAll").onclick = () => p.setAllPatternsVisible(true);
     $("#ptNone").onclick = () => p.setAllPatternsVisible(false);
     const rows = $("#ptRows");

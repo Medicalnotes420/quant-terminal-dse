@@ -22,6 +22,41 @@ export function patternColour(p, theme = "dark") {
   return p.dir === "bull" ? pal.up : p.dir === "bear" ? pal.down : pal.neutral;
 }
 
+// How big the figure is: its highest to lowest point as a percentage of its mid price.
+export function patternSizePct(p) {
+  const ps = p.points.map((q) => q.price), hi = Math.max(...ps), lo = Math.min(...ps);
+  return hi + lo > 0 ? ((hi - lo) / ((hi + lo) / 2)) * 100 : 0;
+}
+
+// Where a pattern is in its life: live (no breakout yet), broken (broke out, target not reached), reached, failed.
+export function patternStage(p) {
+  if (p.status === "Reached") return "reached";
+  if (p.status === "Failed") return "failed";
+  return p.breakI != null ? "broken" : "live";
+}
+
+// The Patterns tab's quality filter: a stage ("all" or one of patternStage) and a minimum size in percent.
+export function passesFilter(p, f) {
+  if (!f) return true;
+  if (f.status && f.status !== "all" && patternStage(p) !== f.status) return false;
+  return !(f.minSize > 0) || patternSizePct(p) >= f.minSize;
+}
+
+// What changed since the last look: `prev` is a Map of key -> { broke, status }. A pattern seen before that has now
+// broken out, reached its target or failed gives one event. New patterns give none (they were just found, not changed).
+export function patternEvents(prev, list) {
+  const out = [];
+  for (const p of list) {
+    const was = prev.get(p.key);
+    if (!was) continue;
+    const lv = (x) => (x == null ? "—" : Number(x).toFixed(2));
+    if (p.status === "Reached" && was.status !== "Reached") out.push({ key: p.key, text: `${p.type} reached its target ${lv(p.target?.price)}` });
+    else if (p.status === "Failed" && was.status !== "Failed") out.push({ key: p.key, text: `${p.type} failed: price closed beyond its stop ${lv(p.stop)}` });
+    else if (p.breakI != null && !was.broke) out.push({ key: p.key, text: `${p.type} broke out ${p.dir === "bear" ? "down" : "up"}: entry ${lv(p.entry)}, stop ${lv(p.stop)}, target ${lv(p.target?.price)}` });
+  }
+  return out;
+}
+
 // distance from point (px, py) to the segment a-b
 export function distToSegment(px, py, ax, ay, bx, by) {
   const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;

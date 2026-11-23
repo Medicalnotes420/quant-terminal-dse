@@ -950,6 +950,13 @@ class App {
     });
   }
 
+  // a chart pattern broke out, reached its target or failed (the chart's own check, so it works while the tab is open)
+  patternAlert(text) {
+    this.toast(`<b>Pattern</b><br>${esc(text)}`, "alert", 12000);
+    this.beep();
+    if ("Notification" in window && Notification.permission === "granted") new Notification("Quant Terminal pattern", { body: text });
+  }
+
   beep() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
