@@ -60,6 +60,7 @@ class App {
           indicators: [
             { uid: newUid(), id: "ema", params: { length: 21 } },
             { uid: newUid(), id: "rsi", params: {} },
+            { uid: newUid(), id: "chartpatterns", params: {} },
           ],
         },
       ],
@@ -199,7 +200,7 @@ class App {
       const base = cfgs[i] || {
         ...structuredClone(cfgs[0] || {}),
         tf: tfs[i % tfs.length],
-        indicators: [],
+        indicators: [{ uid: newUid(), id: "chartpatterns", params: {} }],
       };
       const pane = new ChartPane(this, el, base);
       this.panes.push(pane);
