@@ -20,7 +20,7 @@ import { detect } from "../public/lib/chartpatterns.js";
 import * as dse from "../lib/dse.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const A2 = "../../Stockapp/data/raw/a2/x/Dhaka Stock Exchange End-of-Day Financial Dataset";
+const A2 = path.join(fileURLToPath(new URL("../../Stockapp/", import.meta.url)), "data/raw/a2/x/Dhaka Stock Exchange End-of-Day Financial Dataset");
 const HOLD = 60, TPLUS = 2, LIQUID = 5e6, CONTROL = 20, HOLDOUT = Date.UTC(2026, 0, 25) / 1000, TYPE = process.argv[2] || "Double Bottom", SLUG = TYPE.toLowerCase().replace(/[^a-z]+/g, "-"), WINNER = TYPE === "Double Bottom"; // node scripts/backtest-double-bottom.mjs "Triple Bottom"
 const csv = (f) => fs.readFileSync(f, "utf8").replace(/^﻿/, "").trim().split(/\r?\n/).slice(1).map((l) => l.split(","));
 const equities = csv(`${A2}/metadata/company_metadata.csv`).filter((r) => r[1] === "Equity").map((r) => r[0].trim());

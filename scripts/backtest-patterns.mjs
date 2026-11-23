@@ -22,7 +22,7 @@ import { detect } from "../public/lib/chartpatterns.js";
 import * as dse from "../lib/dse.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const A2 = "../../Stockapp/data/raw/a2/x/Dhaka Stock Exchange End-of-Day Financial Dataset";
+const A2 = path.join(fileURLToPath(new URL("../../Stockapp/", import.meta.url)), "data/raw/a2/x/Dhaka Stock Exchange End-of-Day Financial Dataset");
 const COST = 0.003, HOLD = 60, TPLUS = 2, LIQUID = 5e6, CONTROL = 20, HOLDOUT = Date.UTC(2026, 0, 25) / 1000;
 
 // ---------- data ----------
