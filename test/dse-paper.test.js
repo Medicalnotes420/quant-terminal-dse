@@ -16,6 +16,7 @@ test("trading days skip DSE holidays", () => {
   assert.equal(d.tradingDaysBetween(at("2026-10-19"), at("2026-10-23")), 0); // 20-22 Oct are Durga Puja, 23 is a Friday
   assert.equal(d.tradingDaysBetween(at("2026-10-19"), at("2026-10-25")), 1); // Sunday the 25th is the first
   assert.equal(d.tradingDaysBetween(at("2026-10-19"), at("2026-10-26")), 2);
+  assert.equal(d.tradingDaysBetween(at("2027-03-07"), at("2027-03-14")), 1); // 8-11 Mar Eid-ul-Fitr, 12-13 weekend, Sunday 14th trades
 });
 
 test("a Thursday buy is sellable on Monday under T+2, and a Cat Z buy only on Tuesday", () => {
