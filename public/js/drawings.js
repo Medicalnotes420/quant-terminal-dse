@@ -70,6 +70,24 @@ export const TOOLS = [
     icon: '<rect x="4" y="5" width="16" height="7" fill="currentColor" fill-opacity=".25"/><rect x="4" y="12" width="16" height="7"/>',
   },
   {
+    id: "short",
+    label: "Short position",
+    points: 2,
+    icon: '<rect x="4" y="5" width="16" height="7"/><rect x="4" y="12" width="16" height="7" fill="currentColor" fill-opacity=".25"/>',
+  },
+  {
+    id: "xabcd",
+    label: "XABCD pattern",
+    points: 5,
+    icon: '<path d="M4 17l4-10 5 8 3-7 4 9"/>',
+  },
+  {
+    id: "brush",
+    label: "Brush (drag to draw)",
+    points: 1,
+    icon: '<path d="M4 18c3-8 5 2 8-6s4 0 8-6"/>',
+  },
+  {
     id: "text",
     label: "Text note",
     points: 1,
@@ -133,6 +151,7 @@ export class DrawingLayer {
   }
 
   draw(ctx, size) {
+    if (this.pane.app?.hideDrawings) return;
     ctx.save();
     ctx.font = "11px -apple-system, Segoe UI, Roboto, sans-serif";
     for (const d of [...this.items, ...(this.temp ? [this.temp] : [])]) {
@@ -203,6 +222,19 @@ export class DrawingLayer {
       case "trend":
         line(a.x, a.y, b.x, b.y);
         break;
+      case "brush":
+      case "xabcd": {
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.stroke();
+        if (d.type === "xabcd") {
+          ctx.setLineDash([4, 4]);
+          for (const [i, j] of [[0, 2], [1, 3], [2, 4]]) if (pts[j]) line(pts[i].x, pts[i].y, pts[j].x, pts[j].y);
+          ctx.setLineDash([]);
+          pts.forEach((p, i) => label("XABCD"[i], p.x, p.y - 10, "center", color));
+        }
+        break;
+      }
       case "ray": {
         const [p, q] = extend(a, b, false);
         line(p.x, p.y, q.x, q.y);
@@ -337,7 +369,7 @@ export class DrawingLayer {
       default:
         break;
     }
-    if (active) {
+    if (active && d.type !== "brush") {
       ctx.fillStyle = "#fff";
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
@@ -352,6 +384,7 @@ export class DrawingLayer {
 
   // Nearest drawing within a few pixels of (x, y), for selecting.
   hitTest(x, y) {
+    if (this.pane.app?.hideDrawings || this.pane.app?.lockDrawings) return null;
     let best = null,
       bestD = 7;
     const segDist = (p, q) => {
@@ -375,6 +408,8 @@ export class DrawingLayer {
       else if (d.type === "hray")
         dist = x >= a.x - 4 ? Math.abs(y - a.y) : Infinity;
       else if (d.type === "vline") dist = Math.abs(x - a.x);
+      else if (d.type === "brush" || d.type === "xabcd")
+        dist = Math.min(Infinity, ...pts.slice(1).map((q, i) => segDist(pts[i], q)));
       else if (d.type === "text")
         dist =
           x >= a.x - 4 && x <= a.x + 120 && Math.abs(y - a.y) < 12

@@ -236,6 +236,39 @@ export class ChartPane {
         paneIndex: 0,
       });
     });
+    // Brush: press, drag, release. Drawing tools turn chart scrolling off, so the drag does not pan.
+    const domP = (e) => {
+      const r = this.chartEl.getBoundingClientRect();
+      const x = e.clientX - r.left,
+        y = e.clientY - r.top;
+      const inPlot = x >= 0 && x <= this.chart.timeScale().width() && y >= 0 && y <= this.chart.panes()[0].getHeight();
+      return { point: inPlot ? { x, y } : undefined, logical: inPlot ? this.chart.timeScale().coordinateToLogical(x) : null, paneIndex: 0 };
+    };
+    this.chartEl.addEventListener("mousedown", (e) => {
+      if (this.app.tool !== "brush" || e.button !== 0) return;
+      const pt = this.pointAt(domP(e));
+      if (pt) this.drawings.temp = { id: newUid(), type: "brush", points: [pt] };
+    });
+    this.chartEl.addEventListener("mousemove", (e) => {
+      const t = this.drawings.temp;
+      if (this.app.tool !== "brush" || t?.type !== "brush" || t.points.length >= 600) return;
+      const pt = this.pointAt(domP(e));
+      if (pt) {
+        t.points.push(pt);
+        this.drawings.update();
+      }
+    });
+    document.addEventListener("mouseup", () => {
+      const t = this.drawings.temp;
+      if (t?.type !== "brush") return;
+      this.drawings.temp = null;
+      if (t.points.length > 1) {
+        this.drawings.items.push(t);
+        this.drawings.selected = t;
+        this.app.saveDrawings(this.cfg.symbol, this.drawings.items);
+      }
+      this.drawings.update();
+    });
     this.drawings = new DrawingLayer(this);
     this.makeMainSeries();
   }
@@ -1111,7 +1144,16 @@ export class ChartPane {
     if (!p.point || p.logical == null) return null;
     const logical =
       this.chart.timeScale().coordinateToLogical(p.point.x) ?? p.logical;
-    const price = this.main.coordinateToPrice(p.point.y);
+    let price = this.main.coordinateToPrice(p.point.y);
+    if (this.app.magnet && price != null) {
+      // snap to the nearest open, high, low or close of this bar when within 30px
+      const bar = this.shown[Math.round(logical)];
+      const near = bar && [bar.open, bar.high, bar.low, bar.close]
+        .map((v) => [Math.abs(this.main.priceToCoordinate(v) - p.point.y), v])
+        .filter((m) => Number.isFinite(m[0]))
+        .sort((m, n) => m[0] - n[0])[0];
+      if (near && near[0] < 30) price = near[1];
+    }
     const time = this.timeOfLogical(logical);
     return price == null || time == null ? null : { time, price };
   }
@@ -1150,6 +1192,7 @@ export class ChartPane {
       this.drawings.update();
       return;
     }
+    if (tool === "brush") return; // drawn by dragging, not by clicks
     const def = TOOL_BY_ID[tool];
     const pt = this.pointAt(p);
     if (!def || !pt) return;
@@ -1182,6 +1225,18 @@ export class ChartPane {
       if (!this.app.settings.stayInDrawMode) this.app.setTool("cursor");
     }
     d.update();
+  }
+
+  // Zoom to the last `days` calendar days of the shown bars (null = every bar).
+  setSpan(days) {
+    const n = this.shown.length;
+    if (!n) return;
+    let from = 0;
+    if (days) {
+      const cut = this.shown[n - 1].time - days * 86400;
+      from = Math.max(0, this.shown.findIndex((b) => b.time >= cut));
+    }
+    this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, from - 1), to: n + 8 });
   }
 
   deleteSelectedDrawing() {

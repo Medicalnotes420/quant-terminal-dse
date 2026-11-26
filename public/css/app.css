@@ -244,6 +244,26 @@ select.tb option {
   display: flex;
   height: calc(100% - 44px);
 }
+.rangebar {
+  display: flex;
+  gap: 2px;
+  padding: 2px 8px;
+  border-top: 1px solid var(--border);
+  flex: none;
+}
+.rangebar button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rangebar button:hover {
+  background: rgba(127, 127, 127, 0.2);
+}
 .drawbar {
   width: 44px;
   border-right: 1px solid var(--border);

@@ -103,6 +103,7 @@ class App {
     await this.loadCustomIndicators();
     this.buildToolbar();
     this.buildDrawbar();
+    this.buildRangeBar();
     this.setLayout(this.state.layout, false);
     this.bindSidePanel();
     this.panels = initPanels(this);
@@ -128,7 +129,14 @@ class App {
   getDrawings(symbol) {
     return structuredClone(this.state.drawings[symbol] || []);
   }
-  saveDrawings(symbol, items) {
+  saveDrawings(symbol, items, fromHistory = false) {
+    if (!fromHistory) {
+      // the saved copy is the state before this change; keep up to 50 steps per symbol
+      const h = ((this.hist ||= {})[symbol] ||= { undo: [], redo: [] });
+      h.undo.push(this.getDrawings(symbol));
+      if (h.undo.length > 50) h.undo.shift();
+      h.redo = [];
+    }
     this.state.drawings[symbol] = items.map(
       ({ id, type, points, text, color, rr }) => ({
         id,
@@ -535,6 +543,27 @@ class App {
     this.persist();
   }
 
+  buildRangeBar() {
+    const spans = [["5d", 5], ["1m", 31], ["3m", 92], ["6m", 183], ["1y", 365], ["5y", 1826], ["All", null]];
+    const bar = $("#rangeBar");
+    bar.innerHTML = spans.map(([t, d]) => `<button data-days="${d}">${t}</button>`).join("");
+    bar.onclick = (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      const days = b.dataset.days === "null" ? null : Number(b.dataset.days);
+      for (const p of this.settings.syncSymbol ? this.panes : [this.active]) p?.setSpan(days);
+    };
+  }
+
+  stepDrawings(redo) {
+    const sym = this.active?.cfg.symbol;
+    const h = this.hist?.[sym];
+    const from = redo ? h?.redo : h?.undo;
+    if (!from?.length) return this.toast(redo ? "Nothing to redo." : "Nothing to undo.");
+    (redo ? h.undo : h.redo).push(this.getDrawings(sym));
+    this.saveDrawings(sym, from.pop(), true);
+  }
+
   buildDrawbar() {
     const bar = $("#drawbar");
     bar.innerHTML =
@@ -542,7 +571,12 @@ class App {
         (t, i) =>
           `${i === 1 ? "<hr>" : ""}<button data-tool="${t.id}" title="${t.label}"><svg viewBox="0 0 24 24">${t.icon}</svg></button>`,
       ).join("") +
-      '<hr><button data-act="alert" title="Alert when price crosses the selected line"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20h4"/></svg></button>' +
+      '<hr><button data-act="magnet" title="Magnet: snap drawing points to the nearest open, high, low or close"><svg viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4zM6 8h4M14 8h4"/></svg></button>' +
+      '<button data-act="lock" title="Lock drawings: stops them being selected or deleted"><svg viewBox="0 0 24 24"><path d="M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3"/></svg></button>' +
+      '<button data-act="hide" title="Hide all drawings"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M4 20L20 4"/></svg></button>' +
+      '<hr><button data-act="undo"title="Undo drawing change (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 8"/></svg></button>' +
+      '<button data-act="redo" title="Redo (Ctrl+Y)"><svg viewBox="0 0 24 24"><path d="M15 7l5 5-5 5M20 12H10a6 6 0 0 0 0 8"/></svg></button>' +
+      '<hr><button data-act="alert"title="Alert when price crosses the selected line"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20h4"/></svg></button>' +
       '<button data-act="delete" title="Delete selected drawing (Delete key)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>' +
       '<button data-act="clear" title="Remove all drawings on this symbol"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></svg></button>';
     bar.onclick = (e) => {
@@ -550,6 +584,17 @@ class App {
       if (!b) return;
       if (b.dataset.tool)
         this.setTool(this.tool === b.dataset.tool ? "cursor" : b.dataset.tool);
+      const flag = { magnet: "magnet", lock: "lockDrawings", hide: "hideDrawings" }[b.dataset.act];
+      if (flag) {
+        this[flag] = !this[flag];
+        b.classList.toggle("active", this[flag]);
+        for (const p of this.panes) {
+          if (flag !== "magnet") p.drawings.selected = null;
+          p.drawings.update();
+        }
+      }
+      if (b.dataset.act === "undo") this.stepDrawings(false);
+      if (b.dataset.act === "redo") this.stepDrawings(true);
       if (b.dataset.act === "alert") this.alertOnSelectedDrawing();
       if (b.dataset.act === "delete" && !this.active.deleteSelectedDrawing())
         this.toast("Click a drawing first to select it.");
@@ -870,6 +915,11 @@ class App {
           this.setTf(tf);
           return;
         }
+      }
+      if (!typing && (e.ctrlKey || e.metaKey) && !e.altKey && /^[zy]$/i.test(e.key)) {
+        e.preventDefault();
+        this.stepDrawings(e.key.toLowerCase() === "y" || e.shiftKey);
+        return;
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
       if (
