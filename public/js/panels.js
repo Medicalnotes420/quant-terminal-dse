@@ -256,6 +256,8 @@ export function initPanels(app) {
       overview: renderOverview,
       movers: renderMovers,
       sectors: renderSectors,
+      portfolio: renderPortfolio,
+      screeners: renderScreeners,
       details: renderDetails,
       patterns: renderPatternsTab,
       alerts: renderAlerts,
@@ -685,6 +687,191 @@ export function initPanels(app) {
     side.onclick = (e) => {
       const row = e.target.closest(".mv-row");
       if (row) app.setSymbol(row.dataset.sym);
+    };
+  }
+
+  // ======================= PORTFOLIO =======================
+  // Your holdings, kept in the data folder with the rest of the app's state. Prices are the last day-end close;
+  // profit and loss are before brokerage and tax.
+  async function renderPortfolio() {
+    const list = (app.state.portfolio ||= []);
+    side.innerHTML = '<div class="pad hint-text">Loading…</div>';
+    let rows;
+    try {
+      rows = await loadShares();
+    } catch (err) {
+      side.innerHTML = `<div class="pad hint-text">${esc(err.message)}</div>`;
+      return;
+    }
+    if (sideTab !== "portfolio") return;
+    const bySym = new Map(rows.map((r) => [r.symbol, r]));
+    let cost = 0,
+      value = 0;
+    const lines = list.map((h, i) => {
+      const r = bySym.get(h.symbol),
+        ltp = r?.price,
+        c = h.qty * h.avg,
+        v = ltp != null ? h.qty * ltp : null;
+      cost += c;
+      value += v ?? c;
+      const pnl = v != null ? v - c : null;
+      return `<div class="wl-row pf-row" data-i="${i}" data-sym="${esc(h.symbol)}"><span class="sym ${pnl == null ? "" : dirOf(pnl)}">${esc(ticker(h.symbol))}</span><span>${h.qty}</span><span>${fmtPrice(h.avg)}</span><span>${ltp != null ? fmtPrice(ltp) : "—"}</span><span class="chg ${pnl == null ? "" : dirOf(pnl)}">${pnl == null ? "—" : `${pnl >= 0 ? "+" : ""}${fmtNum(pnl)} (${((pnl / c) * 100).toFixed(1)}%)`}</span><button class="x" title="Remove this holding" data-del><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
+    });
+    const pnl = value - cost;
+    const cur = app.active ? ticker(app.active.cfg.symbol) : "";
+    side.innerHTML = `<div class="pf-form">
+        <input class="in" id="pfSym" placeholder="Symbol" value="${esc(cur)}" size="9">
+        <input class="in" id="pfQty" type="number" min="1" step="1" placeholder="Shares" size="6">
+        <input class="in" id="pfAvg" type="number" min="0" step="0.01" placeholder="Avg price" size="7">
+        <button class="btn small primary" id="pfAdd">Add</button></div>
+      <div class="pf-sum"><span>Cost <b>${fmtNum(cost)}</b></span><span>Value <b>${fmtNum(value)}</b></span><span>P&amp;L <b class="${dirOf(pnl)}">${pnl >= 0 ? "+" : ""}${fmtNum(pnl)}${cost ? ` (${((pnl / cost) * 100).toFixed(1)}%)` : ""}</b></span></div>
+      <div class="sh-head pf-head"><button>Symbol</button><button>Shares</button><button>Avg</button><button>LTP</button><button>P&amp;L</button><span></span></div>
+      ${lines.join("") || '<div class="pad hint-text">No holdings yet. Enter a symbol, the number of shares and your average price, then Add. Adding a share you already hold merges the two at the weighted average price.</div>'}
+      <div class="pad hint-text">Gross of brokerage (0.30%) and tax. Prices are the last day-end close.</div>`;
+    $("#pfAvg").value = bySym.get(`DSE:${cur}`)?.price ?? "";
+    side.onclick = (e) => {
+      const row = e.target.closest(".pf-row");
+      if (e.target.closest("[data-del]") && row) {
+        list.splice(Number(row.dataset.i), 1);
+        app.persist();
+        return renderPortfolio();
+      }
+      if (e.target.closest("#pfAdd")) {
+        const t = $("#pfSym").value.trim().toUpperCase(),
+          q = Math.floor(Number($("#pfQty").value)),
+          a = Number($("#pfAvg").value);
+        const sym = `DSE:${t}`;
+        if (!bySym.has(sym)) return app.toast(`${t || "That"} is not a DSE share in your data.`);
+        if (!(q >= 1)) return app.toast("Enter a whole number of shares, 1 or more.");
+        if (!(a > 0)) return app.toast("Enter your average price.");
+        const have = list.find((h) => h.symbol === sym);
+        if (have) {
+          have.avg = (have.qty * have.avg + q * a) / (have.qty + q);
+          have.qty += q;
+        } else list.push({ symbol: sym, qty: q, avg: a });
+        app.persist();
+        return renderPortfolio();
+      }
+      if (row) app.setSymbol(row.dataset.sym);
+    };
+  }
+
+  // ======================= SCREENERS =======================
+  // A screener is a set of limits on the last day-end figures. Featured ones come with the app, My screeners are yours,
+  // and the heart collects favourites under Liked.
+  const FEATURED = [
+    { id: "f-up5", name: "Up 5% or more", desc: "Shares that gained at least 5% at the last close.", c: { chgMin: 5 } },
+    { id: "f-down5", name: "Down 5% or more", desc: "Shares that lost at least 5% at the last close.", c: { chgMax: -5 } },
+    { id: "f-limit", name: "Near the upper limit", desc: "Up 9% or more, close to the 10% daily limit.", c: { chgMin: 9 } },
+    { id: "f-vol", name: "Heavy volume", desc: "More than one million shares traded.", c: { volMin: 1e6 } },
+    { id: "f-value", name: "High value traded", desc: "More than 5 crore traded (price times volume).", c: { valueMin: 5 } },
+    { id: "f-cheap", name: "Cheap and rising", desc: "Priced under 20 BDT and up on the day.", c: { priceMax: 20, chgMin: 0.01 } },
+    { id: "f-a-up", name: "Category A rising on volume", desc: "Category A shares up 2% or more with over 200,000 traded.", c: { category: "A", chgMin: 2, volMin: 2e5 } },
+    { id: "f-z", name: "Category Z (settles T+3)", desc: "Shares in Category Z, which settle three days after the trade.", c: { category: "Z" } },
+  ];
+  const num = (v) => (v === "" || v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+  const screenMatch = (r, c) =>
+    (c.chgMin == null || r.changePct >= c.chgMin) &&
+    (c.chgMax == null || r.changePct <= c.chgMax) &&
+    (c.priceMin == null || r.price >= c.priceMin) &&
+    (c.priceMax == null || r.price <= c.priceMax) &&
+    (c.volMin == null || (r.volume || 0) >= c.volMin) &&
+    (c.valueMin == null || ((r.price || 0) * (r.volume || 0)) / 1e7 >= c.valueMin) &&
+    (!c.category || r.category === c.category) &&
+    (!c.sector || r.sector === c.sector);
+  const describe = (c) =>
+    [
+      c.chgMin != null && `change ≥ ${c.chgMin}%`, c.chgMax != null && `change ≤ ${c.chgMax}%`,
+      c.priceMin != null && `price ≥ ${c.priceMin}`, c.priceMax != null && `price ≤ ${c.priceMax}`,
+      c.volMin != null && `volume ≥ ${COMPACT.format(c.volMin)}`, c.valueMin != null && `value ≥ ${c.valueMin} cr`,
+      c.category && `category ${c.category}`, c.sector && c.sector,
+    ].filter(Boolean).join(" · ") || "no limits";
+  let scrTab = "featured",
+    scrRun = null; // { name, c }
+
+  async function renderScreeners() {
+    side.innerHTML = '<div class="pad hint-text">Loading…</div>';
+    let rows;
+    try {
+      rows = await loadShares();
+    } catch (err) {
+      side.innerHTML = `<div class="pad hint-text">${esc(err.message)}</div>`;
+      return;
+    }
+    if (sideTab !== "screeners") return;
+    const mine = (app.state.myScreeners ||= {}),
+      liked = (app.state.likedScreeners ||= []);
+    if (scrRun) {
+      const hits = rows.filter((r) => screenMatch(r, scrRun.c)).sort((a, b) => b.changePct - a.changePct);
+      side.innerHTML = `<div class="scr-bar"><button class="btn small" data-back>◂ Back</button><b>${esc(scrRun.name)}</b></div>
+        <div class="mv-note">${hits.length} of ${rows.length} shares · ${esc(describe(scrRun.c))}</div>
+        ${hits.length > 300 ? '<div class="mv-note">Showing the first 300.</div>' : ""}
+        ${moverRows(hits.slice(0, 300), (r) => COMPACT.format(r.volume))}`;
+      side.onclick = (e) => {
+        if (e.target.closest("[data-back]")) {
+          scrRun = null;
+          return renderScreeners();
+        }
+        const row = e.target.closest(".mv-row");
+        if (row) app.setSymbol(row.dataset.sym);
+      };
+      return;
+    }
+    const all = [...FEATURED.map((f) => ({ id: f.id, name: f.name, desc: f.desc, c: f.c })), ...Object.entries(mine).map(([n, c]) => ({ id: `m:${n}`, name: n, desc: describe(c), c, own: true }))];
+    const shown = scrTab === "featured" ? all.filter((s) => !s.own) : scrTab === "mine" ? all.filter((s) => s.own) : all.filter((s) => liked.includes(s.id));
+    const card = (s) => `<div class="scr-card" data-id="${esc(s.id)}"><div class="scr-text"><b>${esc(s.name)}</b><small>${esc(s.desc)}</small></div><small class="scr-n">${rows.filter((r) => screenMatch(r, s.c)).length}</small><button class="heart ${liked.includes(s.id) ? "on" : ""}" data-heart title="${liked.includes(s.id) ? "Remove from Liked" : "Add to Liked"}">${liked.includes(s.id) ? "♥" : "♡"}</button>${s.own ? '<button class="x" data-del title="Delete this screener"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' : ""}<button class="btn small" data-run>Run</button></div>`;
+    const cats = [...new Set(rows.map((r) => r.category).filter(Boolean))].sort(),
+      secs = [...new Set(rows.map((r) => r.sector).filter(Boolean))].sort();
+    const field = (id, label, ph) => `<label>${label}<input class="in" id="${id}" type="number" step="any" placeholder="${ph}"></label>`;
+    side.innerHTML = `<div class="ov-tabs">${[["featured", "Featured"], ["mine", "My screeners"], ["liked", "Liked"]].map(([k, l]) => `<button data-t="${k}" class="${k === scrTab ? "on" : ""}">${l}</button>`).join("")}</div>
+      ${scrTab === "mine" ? `<details class="mv-sec scr-new" open><summary><span>New screener</span></summary><div class="scr-form">
+          ${field("scChgMin", "Change % from", "e.g. 2")}${field("scChgMax", "Change % to", "e.g. 10")}${field("scPriceMin", "Price from", "")}${field("scPriceMax", "Price to", "")}${field("scVolMin", "Volume at least", "e.g. 100000")}${field("scValueMin", "Value at least (cr)", "e.g. 1")}
+          <label>Category<select class="in" id="scCat"><option value="">Any</option>${cats.map((c) => `<option>${esc(c)}</option>`).join("")}</select></label>
+          <label>Sector<select class="in" id="scSec"><option value="">Any</option>${secs.map((c) => `<option>${esc(c)}</option>`).join("")}</select></label>
+          <label class="scr-wide">Name (to save)<input class="in" id="scName" placeholder="My screener"></label>
+          <div class="scr-wide scr-btns"><button class="btn small" data-try>Run</button><button class="btn small primary" data-save>Save</button></div></div></details>` : ""}
+      ${shown.map(card).join("") || `<div class="pad hint-text">${scrTab === "mine" ? "No saved screeners yet. Fill in the form above and Save." : "Nothing here yet. Tap the heart on a screener to keep it here."}</div>`}`;
+    const read = () => ({
+      chgMin: num($("#scChgMin").value), chgMax: num($("#scChgMax").value), priceMin: num($("#scPriceMin").value), priceMax: num($("#scPriceMax").value),
+      volMin: num($("#scVolMin").value), valueMin: num($("#scValueMin").value), category: $("#scCat").value || undefined, sector: $("#scSec").value || undefined,
+    });
+    side.onclick = (e) => {
+      const t = e.target.closest("[data-t]")?.dataset.t;
+      if (t) {
+        scrTab = t;
+        return renderScreeners();
+      }
+      if (e.target.closest("[data-try]")) {
+        scrRun = { name: "Unsaved screener", c: read() };
+        return renderScreeners();
+      }
+      if (e.target.closest("[data-save]")) {
+        const name = $("#scName").value.trim();
+        if (!name) return app.toast("Give the screener a name first.");
+        mine[name] = read();
+        app.persist();
+        app.toast(`Saved "${name}".`);
+        return renderScreeners();
+      }
+      const el = e.target.closest(".scr-card");
+      if (!el) return;
+      const s = all.find((x) => x.id === el.dataset.id);
+      if (!s) return;
+      if (e.target.closest("[data-heart]")) {
+        const i = liked.indexOf(s.id);
+        i < 0 ? liked.push(s.id) : liked.splice(i, 1);
+        app.persist();
+        return renderScreeners();
+      }
+      if (e.target.closest("[data-del]")) {
+        delete mine[s.name];
+        const i = liked.indexOf(s.id);
+        if (i >= 0) liked.splice(i, 1);
+        app.persist();
+        return renderScreeners();
+      }
+      scrRun = { name: s.name, c: s.c };
+      renderScreeners();
     };
   }
 
