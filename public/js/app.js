@@ -745,8 +745,15 @@ class App {
         : `<div class="dg">${item(T[ids[0]])}<div class="dg-fly">${ids.map((id) => item(T[id], `<span>${T[id].label}</span>`)).join("")}</div></div>`;
     // BullBD's groups, in its order: cursors, lines, Fibonacci, shapes, annotation, patterns, prediction and measurement
     bar.innerHTML =
-      item(T.cursor) + "<hr>" +
-      [["trend", "ray", "extended", "hline", "hray", "vline", "channel"], ["fib"], ["brush", "rect"], ["text"], ["xabcd"], ["long", "short", "measure"]].map(group).join("") +
+      [["cursor", "eraser"]].map(group).join("") + "<hr>" +
+      [
+        ["trend", "arrow", "info", "angle", "ray", "extended", "hline", "hray", "vline", "crossline", "channel"],
+        ["fib", "fibext"],
+        ["brush", "highlighter", "rect", "circle", "ellipse", "triangle"],
+        ["text", "note", "pricelabel", "arrowup", "arrowdown", "flag"],
+        ["xabcd", "abcd"],
+        ["long", "short", "daterange", "pricerange", "daterangeprice", "measure"],
+      ].map(group).join("") +
       "<hr>" + item(T.zoom) +
       '<button data-act="magnet" title="Magnet: snap drawing points to the nearest open, high, low or close"><svg viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4zM6 8h4M14 8h4"/></svg></button>' +
       '<button data-act="stay" title="Stay in drawing mode: keep the tool after placing a drawing"><svg viewBox="0 0 24 24"><path d="M4 20l4-1L19 8l-3-3L5 16zM14 7l3 3"/></svg></button>' +

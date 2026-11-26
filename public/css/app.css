@@ -1253,3 +1253,91 @@ body { font-family: Roboto, -apple-system, "Helvetica Neue", Helvetica, Arial, "
 .nav-always .nav-pill { opacity: 1; }
 .pane-never .pane-actions, .pane-never .pane-tools { display: none; }
 .pane-always .pane-actions { opacity: 1; }
+
+/* ===== Polish: type, palette, radii, motion ===== */
+:root, [data-theme="dark"] {
+  --bg: #0d1218;
+  --panel: #141b23;
+  --panel-2: #1b2430;
+  --border: #222c38;
+  --text: #e3e9ef;
+  --muted: #8794a3;
+  --hover: #1b2430;
+  --grid: rgba(34, 44, 56, 0.55);
+  --input: #0d1218;
+  --accent: #25c08a;
+  --accent-soft: rgba(37, 192, 138, 0.16);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --scroll: #2c3846;
+}
+[data-theme="light"] {
+  --bg: #ffffff;
+  --panel: #f6f8f7;
+  --panel-2: #edf1ef;
+  --border: rgba(19, 49, 43, 0.11);
+  --text: #11231d;
+  --muted: #5a6b66;
+  --hover: rgba(19, 49, 43, 0.06);
+  --grid: rgba(19, 49, 43, 0.07);
+  --input: #ffffff;
+  --accent: #0f7151;
+  --accent-soft: rgba(15, 113, 81, 0.12);
+  --shadow: 0 12px 40px rgba(19, 49, 43, 0.18);
+  --scroll: #c3cdc9;
+}
+body {
+  font-family: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13.5px;
+  letter-spacing: 0.005em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.px, .chg, .vol, td, th, .dt-row, .legend, .ohlc, .sh-row, .ob-row, .pt-row, #shNote, .ex { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "cv11" 1; }
+::selection { background: var(--accent-soft); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button, select, input { font-family: inherit; }
+
+/* top bar */
+.topbar { border-bottom-color: var(--border); box-shadow: 0 1px 0 var(--border); }
+.tb { border-radius: 8px; transition: background-color 0.12s ease, color 0.12s ease; }
+.tb:hover { background: var(--hover); }
+.tb.on { background: var(--accent-soft); color: var(--accent); }
+.symbol-btn { font-weight: 700; letter-spacing: 0.02em; }
+.tf-group button { border-radius: 8px; transition: background-color 0.12s ease, color 0.12s ease; }
+.tf-group button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.tf-custom, .in, .search-in, select.tb, .field input, .field select { border-radius: 8px; }
+.in:focus, .search-in:focus, .field input:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+
+/* buttons, tabs, panels */
+.btn { border-radius: 8px; transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.05s ease; }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.tabs button { border-radius: 8px 8px 0 0; transition: color 0.12s ease; }
+.tabs button.active { color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+.side, .center, .drawbar, .side-rail { background: var(--bg); }
+.side-head { font-size: 14px; letter-spacing: 0.01em; }
+.wl-row { transition: background-color 0.1s ease; }
+.wl-row.current { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.sh-head { text-transform: none; letter-spacing: 0.02em; }
+.sh-head button.on { color: var(--accent); background: transparent; }
+.up, .wl-row .chg.up { color: var(--up); }
+.down, .wl-row .chg.down { color: var(--down); }
+
+/* floating bits and dialogs */
+.pill { backdrop-filter: blur(8px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28); border-radius: 22px; }
+.dg-fly { border-radius: 10px; box-shadow: var(--shadow); padding: 6px; }
+.drawbar .dg-fly button { border-radius: 6px; }
+.modal { backdrop-filter: blur(3px); }
+.modal-card { border-radius: 14px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+.modal-head { font-size: 15px; font-weight: 600; }
+.card { border-radius: 12px; }
+.set-tabs button { border-radius: 8px 8px 0 0; }
+.set-tabs button.active { font-weight: 600; }
+#toasts > *, .toast { border-radius: 10px; box-shadow: var(--shadow); }
+.legend { font-size: 12.5px; }
+.legend .row .title { font-weight: 700; letter-spacing: 0.01em; }
+.pane.active::after { border-radius: 2px; }
+.rangebar button, #tzSel { border-radius: 6px; }
+.rangebar button:hover { background: var(--hover); }
+.rangebar button.on { font-weight: 600; }

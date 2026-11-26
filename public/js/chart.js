@@ -181,6 +181,7 @@ export class ChartPane {
         background: { type: "solid", color: css("--bg") },
         textColor: css("--text"),
         fontSize: 11,
+        fontFamily: "Inter, \"Segoe UI Variable Text\", \"Segoe UI\", system-ui, sans-serif",
         panes: {
           separatorColor: css("--border"),
           separatorHoverColor: css("--accent-soft"),
@@ -246,13 +247,13 @@ export class ChartPane {
       return { point: inPlot ? { x, y } : undefined, logical: inPlot ? this.chart.timeScale().coordinateToLogical(x) : null, paneIndex: 0 };
     };
     this.chartEl.addEventListener("mousedown", (e) => {
-      if (this.app.tool !== "brush" || e.button !== 0) return;
+      if (!["brush", "highlighter"].includes(this.app.tool) || e.button !== 0) return;
       const pt = this.pointAt(domP(e));
-      if (pt) this.drawings.temp = { id: newUid(), type: "brush", points: [pt] };
+      if (pt) this.drawings.temp = { id: newUid(), type: this.app.tool, points: [pt] };
     });
     this.chartEl.addEventListener("mousemove", (e) => {
       const t = this.drawings.temp;
-      if (this.app.tool !== "brush" || t?.type !== "brush" || t.points.length >= 600) return;
+      if (!["brush", "highlighter"].includes(this.app.tool) || !["brush", "highlighter"].includes(t?.type) || t.points.length >= 600) return;
       const pt = this.pointAt(domP(e));
       if (pt) {
         t.points.push(pt);
@@ -261,7 +262,7 @@ export class ChartPane {
     });
     document.addEventListener("mouseup", () => {
       const t = this.drawings.temp;
-      if (t?.type !== "brush") return;
+      if (!["brush", "highlighter"].includes(t?.type)) return;
       this.drawings.temp = null;
       if (t.points.length > 1) {
         this.drawings.items.push(t);
@@ -279,7 +280,7 @@ export class ChartPane {
       const item = start && d.hitTest(p.point.x, p.point.y);
       if (!item) return;
       d.selected = item;
-      const handle = item.type === "brush" ? -1 : item.points.findIndex((q) => Math.hypot(d.x(q.time) - p.point.x, d.y(q.price) - p.point.y) < 8);
+      const handle = ["brush", "highlighter"].includes(item.type) ? -1 : item.points.findIndex((q) => Math.hypot(d.x(q.time) - p.point.x, d.y(q.price) - p.point.y) < 8);
       this._drag = { item, handle, start, orig: structuredClone(item.points), moved: false };
       this.chart.applyOptions({ handleScroll: false, handleScale: false });
       e.stopPropagation();
@@ -1239,7 +1240,17 @@ export class ChartPane {
       this.drawings.update();
       return;
     }
-    if (tool === "brush") return; // drawn by dragging, not by clicks
+    if (tool === "brush" || tool === "highlighter") return; // drawn by dragging, not by clicks
+    if (tool === "eraser") {
+      const hit = p.point && this.drawings.hitTest(p.point.x, p.point.y);
+      if (hit) {
+        this.drawings.items = this.drawings.items.filter((x) => x !== hit);
+        this.drawings.selected = null;
+        this.drawings.update();
+        this.app.saveDrawings(this.cfg.symbol, this.drawings.items);
+      }
+      return;
+    }
     const def = TOOL_BY_ID[tool];
     const pt = this.pointAt(p);
     if (!def || !pt) return;
@@ -1264,7 +1275,7 @@ export class ChartPane {
         if (l2 - l1 >= 2) this.chart.timeScale().setVisibleLogicalRange({ from: l1, to: l2 });
         return;
       }
-      if (item.type === "text") {
+      if (item.type === "text" || item.type === "note") {
         const text = prompt("Note text:", "");
         if (!text) {
           d.update();
