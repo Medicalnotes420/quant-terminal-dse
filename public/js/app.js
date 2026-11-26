@@ -507,6 +507,12 @@ class App {
       this.syncToolbar();
       this.persist();
     };
+    $("#tbUndo").onclick = () => this.stepDrawings(false);
+    $("#tbRedo").onclick = () => this.stepDrawings(true);
+    $("#zoomInBtn").onclick = () => this.active?.zoomBy(0.7);
+    $("#zoomOutBtn").onclick = () => this.active?.zoomBy(1 / 0.7);
+    $("#fsBtn").onclick = () =>
+      document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
     $("#snapBtn").onclick = () =>
       this.active
         .screenshot()

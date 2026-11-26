@@ -1265,6 +1265,14 @@ export class ChartPane {
     d.update();
   }
 
+  // Zoom in (f < 1) or out (f > 1), keeping the right-hand edge where it is.
+  zoomBy(f) {
+    const r = this.chart.timeScale().getVisibleLogicalRange();
+    if (!r) return;
+    const width = Math.max(10, (r.to - r.from) * f);
+    this.chart.timeScale().setVisibleLogicalRange({ from: r.to - width, to: r.to });
+  }
+
   // Zoom to the last `days` calendar days of the shown bars (null = every bar).
   setSpan(days) {
     const n = this.shown.length;

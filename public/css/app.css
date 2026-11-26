@@ -124,6 +124,9 @@ svg {
   overflow-x: auto;
   overflow-y: hidden;
 }
+/* the right-hand buttons (snapshot, settings, light/dark) stay on screen; the rest of the bar scrolls and loses its labels on narrow windows */
+.tb-right { position: sticky; right: 0; margin-left: auto; display: flex; align-items: center; gap: 2px; padding-left: 6px; background: var(--bg); flex: none; }
+@media (max-width: 1500px) { .topbar .tb > span { display: none; } }
 .topbar::-webkit-scrollbar {
   height: 0;
 }
