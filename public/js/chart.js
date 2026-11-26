@@ -625,7 +625,7 @@ export class ChartPane {
       },
     });
     this.chart.priceScale("right").applyOptions({
-      mode: this.cfg.compare.length
+      mode: this.cfg.compare.length || this.cfg.pct
         ? LW.PriceScaleMode.Percentage
         : this.cfg.log
           ? LW.PriceScaleMode.Logarithmic

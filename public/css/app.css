@@ -307,6 +307,19 @@ select.tb option {
 .side-rail button:hover { background: var(--hover); color: var(--text); }
 .side-rail button.active { color: var(--accent); background: var(--accent-soft); }
 .side-open { display: none !important; }
+/* the icon rail replaces the text tabs and the minimize arrow (the app still clicks the tab buttons itself) */
+#sideTabs { display: none; }
+.side-head { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 13px; }
+.side-head button { width: 28px; height: 28px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+.side-head button:hover { background: var(--hover); color: var(--text); }
+.side-head svg, .draw-open svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.drawbar .dg-collapse { margin-top: auto; margin-bottom: 8px; width: 24px; height: 40px; border-radius: 4px; color: var(--muted); }
+.draw-open { display: none; position: absolute; left: 0; top: 56px; z-index: 7; width: 20px; height: 44px; border: 1px solid var(--border); border-left: 0; border-radius: 0 6px 6px 0; background: var(--panel); color: var(--muted); cursor: pointer; padding: 0; place-items: center; }
+.draw-open:hover { color: var(--text); background: var(--hover); }
+.main.draw-collapsed .drawbar { display: none; }
+.main.draw-collapsed .draw-open { display: inline-grid; }
+.rangebar .rb-right { margin-left: auto; display: flex; gap: 2px; }
+.rangebar button.on { color: var(--accent); background: var(--accent-soft); }
 .drawbar hr {
   width: 24px;
   border: 0;

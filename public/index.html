@@ -43,16 +43,21 @@
       />
       <div class="sep"></div>
       <select id="chartType" class="tb" title="Chart type"></select>
-      <button id="indicatorsBtn" class="tb" title="Indicators">
-        <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 6-8 3 3" /></svg
-        ><span>Indicators</span>
-      </button>
       <button id="compareBtn" class="tb" title="Compare symbols">
         <svg viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="8" />
           <path d="M12 6v12M6 12h12" /></svg
         ><span>Compare</span>
       </button>
+      <button id="indicatorsBtn" class="tb" title="Indicators">
+        <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 6-8 3 3" /></svg
+        ><span>Indicators</span>
+      </button>
+      <div class="sep"></div>
+      <button id="tbUndo" class="tb icon" title="Undo drawing change (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 8" /></svg></button>
+      <button id="tbRedo" class="tb icon" title="Redo (Ctrl+Y)"><svg viewBox="0 0 24 24"><path d="M15 7l5 5-5 5M20 12H10a6 6 0 0 0 0 8" /></svg></button>
+      <button id="zoomOutBtn" class="tb icon" title="Zoom out"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="M15 15l5 5M7 10h6" /></svg></button>
+      <button id="zoomInBtn" class="tb icon" title="Zoom in"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="M15 15l5 5M7 10h6M10 7v6" /></svg></button>
       <div class="sep"></div>
       <select id="layoutSel" class="tb" title="Chart layout">
         <option value="1">1 chart</option>
@@ -64,10 +69,6 @@
         <option value="8">8 charts</option>
         <option value="16">16 charts</option>
       </select>
-      <button id="tbUndo" class="tb icon" title="Undo drawing change (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 8" /></svg></button>
-      <button id="tbRedo" class="tb icon" title="Redo (Ctrl+Y)"><svg viewBox="0 0 24 24"><path d="M15 7l5 5-5 5M20 12H10a6 6 0 0 0 0 8" /></svg></button>
-      <button id="zoomOutBtn" class="tb icon" title="Zoom out"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="M15 15l5 5M7 10h6" /></svg></button>
-      <button id="zoomInBtn" class="tb icon" title="Zoom in"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="M15 15l5 5M7 10h6M10 7v6" /></svg></button>
       <label class="tb check" title="Change the symbol on every chart at once"
         ><input type="checkbox" id="syncSymbol" /> Sync</label
       >
@@ -82,10 +83,6 @@
       <button id="adjBtn" class="tb" title="Adjusted: prices corrected for bonus, rights and split ex-dates. Unadjusted: the prices that traded.">
         <svg viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9M4 21h16" /></svg
         ><span>Adjusted</span>
-      </button>
-      <button id="detailsBtn" class="tb" title="Details of the share on the chart: day numbers, category, settlement, EPS, news">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16M4 10h16M4 15h10M4 20h7" /></svg
-        ><span>Details</span>
       </button>
       <button id="marksBtn" class="tb on" title="Show or hide the markers: pattern signals, trades and indicator signals">
         <svg viewBox="0 0 24 24"><path d="M12 3l2.5 6 6 .5-4.6 4 1.4 6.2L12 16.7 6.7 19.7l1.4-6.2-4.6-4 6-.5z" /></svg
@@ -102,9 +99,6 @@
       </button>
       <div class="spacer"></div>
       <div class="tb-right">
-      <button id="logBtn" class="tb" title="Logarithmic price scale">
-        Log
-      </button>
       <button id="fsBtn" class="tb icon" title="Full screen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg></button>
       <button id="snapBtn" class="tb icon" title="Take a snapshot (downloads the chart as an image)">
         <svg viewBox="0 0 24 24">
@@ -130,9 +124,16 @@
 
   <div class="main">
       <nav class="drawbar" id="drawbar"></nav>
+      <button id="drawOpen" class="draw-open" title="Show the drawing toolbar" aria-label="Show the drawing toolbar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg></button>
       <section class="center">
         <div id="grid" class="grid"></div>
-        <div id="rangeBar" class="rangebar" title="Zoom the chart to a time span (daily data, so no intraday)"></div>
+        <div id="rangeBar" class="rangebar" title="Zoom the chart to a time span (daily data, so no intraday)">
+          <div class="rb-right">
+            <button id="pctBtn" title="Show price change in percent">%</button>
+            <button id="logBtn" title="Logarithmic price scale">Log</button>
+            <button id="autoBtn" title="Fit the price scale to the bars on screen">Auto</button>
+          </div>
+        </div>
         <div id="bottom" class="bottom collapsed">
           <div class="tabs" id="bottomTabs">
             <button data-tab="tester" class="active">Strategy tester</button>
@@ -159,6 +160,7 @@
           <div class="spacer"></div>
           <button id="sideToggle" class="icon" title="Minimize the side panel" aria-label="Minimize the side panel"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg></button>
         </div>
+        <div class="side-head"><span id="sideTitle"></span><button id="sideClose" title="Close tools panel" aria-label="Close tools panel"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button></div>
         <div class="tab-body" id="sideBody"></div>
         <div class="side-notes" id="sideNotes" aria-live="polite"></div>
       </aside>

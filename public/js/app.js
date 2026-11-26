@@ -260,6 +260,7 @@ class App {
     const rail = $("#sideRail");
     const sync = () => {
       const cur = document.querySelector("#sideTabs .active")?.dataset.tab;
+      $("#sideTitle").textContent = document.querySelector("#sideTabs .active")?.textContent.trim() || "";
       rail.querySelectorAll("button").forEach((b) => b.classList.toggle("active", !this.state.sideCollapsed && b.dataset.tab === cur));
     };
     const collapse = (on) => {
@@ -268,6 +269,7 @@ class App {
       this.persist();
       sync();
     };
+    $("#sideClose").onclick = () => collapse(true);
     rail.onclick = (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -487,7 +489,6 @@ class App {
       this.syncToolbar();
       this.persist();
     };
-    $("#detailsBtn").onclick = () => this.panels.showSide("details");
     $("#marksBtn").onclick = () => {
       this.active.cfg.marks = this.active.cfg.marks === false; // on by default
       this.active.render(false);
@@ -546,6 +547,7 @@ class App {
     $("#tfCustom").classList.toggle("on", !TF_QUICK.includes(p.cfg.tf));
     $("#chartType").value = p.cfg.type;
     $("#logBtn").classList.toggle("on", !!p.cfg.log);
+    $("#pctBtn").classList.toggle("on", !!p.cfg.pct);
     $("#patBtn").classList.toggle("on", !!p.cfg.patterns);
     $("#marksBtn").classList.toggle("on", p.cfg.marks !== false);
     $("#adjBtn").classList.toggle("on", !!p.cfg.adjusted);
@@ -573,10 +575,17 @@ class App {
   buildRangeBar() {
     const spans = [["5d", 5], ["1m", 31], ["3m", 92], ["6m", 183], ["1y", 365], ["5y", 1826], ["All", null]];
     const bar = $("#rangeBar");
-    bar.innerHTML = spans.map(([t, d]) => `<button data-days="${d}">${t}</button>`).join("");
+    bar.insertAdjacentHTML("afterbegin", spans.map(([t, d]) => `<button data-days="${d}">${t}</button>`).join(""));
+    $("#pctBtn").onclick = () => {
+      this.active.cfg.pct = !this.active.cfg.pct;
+      this.active.render(false);
+      this.syncToolbar();
+      this.persist();
+    };
+    $("#autoBtn").onclick = () => this.active?.chart.priceScale("right").applyOptions({ autoScale: true });
     bar.onclick = (e) => {
       const b = e.target.closest("button");
-      if (!b) return;
+      if (!b || !("days" in b.dataset)) return;
       const days = b.dataset.days === "null" ? null : Number(b.dataset.days);
       this.span = days; // charts opened later in a bigger layout start on the same span
       for (const p of this.settings.syncSymbol ? this.panes : [this.active]) p?.setSpan(days);
@@ -592,27 +601,40 @@ class App {
     this.saveDrawings(sym, from.pop(), true);
   }
 
+  setDrawbar(open) {
+    this.settings.drawCollapsed = !open;
+    $(".main").classList.toggle("draw-collapsed", !open);
+    this.persist();
+    requestAnimationFrame(() => window.dispatchEvent(new Event("resize"))); // charts refit the wider area
+  }
+
   buildDrawbar() {
     const bar = $("#drawbar");
     // Tools sit in groups like BullBD's toolbar: the button shows the last tool used, a flyout lists the rest.
     const T = Object.fromEntries(TOOLS.map((t) => [t.id, t]));
     const item = (t, label = "") => `<button data-tool="${t.id}" title="${t.label}"><svg viewBox="0 0 24 24">${t.icon}</svg>${label}</button>`;
     const group = (ids) =>
-      `<div class="dg">${item(T[ids[0]])}<div class="dg-fly">${ids.map((id) => item(T[id], `<span>${T[id].label}</span>`)).join("")}</div></div>`;
+      ids.length === 1
+        ? item(T[ids[0]])
+        : `<div class="dg">${item(T[ids[0]])}<div class="dg-fly">${ids.map((id) => item(T[id], `<span>${T[id].label}</span>`)).join("")}</div></div>`;
+    // BullBD's groups, in its order: cursors, lines, Fibonacci, shapes, annotation, patterns, prediction and measurement
     bar.innerHTML =
       item(T.cursor) + "<hr>" +
-      [["trend", "ray", "extended", "hline", "hray", "vline", "channel"], ["fib", "xabcd"], ["brush", "rect"], ["long", "short", "measure"]].map(group).join("") +
-      item(T.text) + item(T.zoom) +
-      '<hr><button data-act="magnet" title="Magnet: snap drawing points to the nearest open, high, low or close"><svg viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4zM6 8h4M14 8h4"/></svg></button>' +
+      [["trend", "ray", "extended", "hline", "hray", "vline", "channel"], ["fib"], ["brush", "rect"], ["text"], ["xabcd"], ["long", "short", "measure"]].map(group).join("") +
+      "<hr>" + item(T.zoom) +
+      '<button data-act="magnet" title="Magnet: snap drawing points to the nearest open, high, low or close"><svg viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4zM6 8h4M14 8h4"/></svg></button>' +
+      '<button data-act="stay" title="Stay in drawing mode: keep the tool after placing a drawing"><svg viewBox="0 0 24 24"><path d="M4 20l4-1L19 8l-3-3L5 16zM14 7l3 3"/></svg></button>' +
       '<button data-act="lock" title="Lock drawings: stops them being selected or deleted"><svg viewBox="0 0 24 24"><path d="M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3"/></svg></button>' +
       '<button data-act="hide" title="Hide all drawings"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M4 20L20 4"/></svg></button>' +
-      '<hr><button data-act="undo"title="Undo drawing change (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 8"/></svg></button>' +
-      '<button data-act="redo" title="Redo (Ctrl+Y)"><svg viewBox="0 0 24 24"><path d="M15 7l5 5-5 5M20 12H10a6 6 0 0 0 0 8"/></svg></button>' +
       '<hr><button data-act="alert"title="Alert when price crosses the selected line"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20h4"/></svg></button>' +
       '<button data-act="delete" title="Delete selected drawing (Delete key)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>' +
-      '<button data-act="clear" title="Remove all drawings on this symbol"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></svg></button>';
+      '<button data-act="clear" title="Remove all drawings on this symbol"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></svg></button>' +
+      '<button data-act="collapse" class="dg-collapse" title="Hide the drawing toolbar"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
     for (const [act, flag] of [["magnet", "magnet"], ["lock", "lockDrawings"], ["hide", "hideDrawings"]])
       bar.querySelector(`[data-act="${act}"]`).classList.toggle("active", !!this[flag]);
+    bar.querySelector('[data-act="stay"]').classList.toggle("active", !!this.settings.stayInDrawMode);
+    $(".main").classList.toggle("draw-collapsed", !!this.settings.drawCollapsed);
+    $("#drawOpen").onclick = () => this.setDrawbar(true);
     bar.onclick = (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -640,8 +662,12 @@ class App {
           p.drawings.update();
         }
       }
-      if (b.dataset.act === "undo") this.stepDrawings(false);
-      if (b.dataset.act === "redo") this.stepDrawings(true);
+      if (b.dataset.act === "stay") {
+        this.settings.stayInDrawMode = !this.settings.stayInDrawMode;
+        b.classList.toggle("active", this.settings.stayInDrawMode);
+        this.persist();
+      }
+      if (b.dataset.act === "collapse") this.setDrawbar(false);
       if (b.dataset.act === "alert") this.alertOnSelectedDrawing();
       if (b.dataset.act === "delete" && !this.active.deleteSelectedDrawing())
         this.toast("Click a drawing first to select it.");
