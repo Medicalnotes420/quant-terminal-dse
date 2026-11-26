@@ -2253,6 +2253,53 @@ export const INDICATORS = [
     },
   },
   {
+    id: "chaikinvol",
+    name: "Chaikin Volatility",
+    group: "Volatility",
+    overlay: false,
+    inputs: [len(10), { key: "roc", label: "Rate of change length", type: "int", default: 10 }],
+    outputs: [line("value", "Chaikin Vol", "#43a047")],
+    levels: [0],
+    // the percentage change of the EMA of the high-low range over the last `roc` bars
+    calc: (bars, p) => {
+      const e = ema(bars.map((b) => b.high - b.low), p.length);
+      return {
+        value: e.map((v, k) => {
+          const prev = e[k - p.roc];
+          return k >= p.roc && isNum(v) && isNum(prev) && prev !== 0 ? ((v - prev) / prev) * 100 : NaN;
+        }),
+      };
+    },
+  },
+  {
+    id: "asi",
+    name: "Accumulative Swing Index",
+    group: "Momentum",
+    overlay: false,
+    inputs: [{ key: "limit", label: "Limit move value", type: "float", default: 0.5 }],
+    outputs: [line("value", "ASI", "#2962ff")],
+    levels: [0],
+    // Welles Wilder's swing index for each bar, summed bar by bar
+    calc: (bars, p) => {
+      let total = 0;
+      return {
+        value: bars.map((b, k) => {
+          if (k === 0) return 0;
+          const y = bars[k - 1];
+          const hc = Math.abs(b.high - y.close),
+            lc = Math.abs(b.low - y.close),
+            hl = Math.abs(b.high - b.low),
+            co = Math.abs(y.close - y.open);
+          const kk = Math.max(hc, lc);
+          const r = hc >= lc && hc >= hl ? hc - 0.5 * lc + 0.25 * co : lc >= hc && lc >= hl ? lc - 0.5 * hc + 0.25 * co : hl + 0.25 * co;
+          const si = r === 0 || !p.limit ? 0 : (50 * ((b.close - y.close) + 0.5 * (b.close - b.open) + 0.25 * (y.close - y.open))) / r * (kk / p.limit);
+          total += si;
+          return total;
+        }),
+      };
+    },
+  },
+  {
     id: "pvt",
     name: "Price Volume Trend",
     volumeFormat: true,

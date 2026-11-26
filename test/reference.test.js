@@ -556,6 +556,32 @@ const REF = {
     );
     return { value: sub(EMA(adl, 3), EMA(adl, 10)) };
   },
+  chaikinvol: () => {
+    // Percent change of the 10-bar EMA of the range over its value 10 bars ago.
+    const e = EMA(bars.map((b) => b.high - b.low), 10);
+    return { value: e.map((v, i) => (i >= 10 && ok(v) && ok(e[i - 10]) && e[i - 10] !== 0 ? 100 * (v / e[i - 10] - 1) : NaN)) };
+  },
+  asi: () => {
+    // Wilder's swing index, bar by bar, with a running total; the limit move is 0.5.
+    let acc = 0;
+    return {
+      value: bars.map((b, i) => {
+        if (!i) return 0;
+        const q = bars[i - 1];
+        const hc = Math.abs(b.high - q.close),
+          lc = Math.abs(b.low - q.close),
+          hl = Math.abs(b.high - b.low),
+          co = Math.abs(q.close - q.open);
+        let R;
+        if (hc >= lc && hc >= hl) R = hc - lc / 2 + co / 4;
+        else if (lc >= hc && lc >= hl) R = lc - hc / 2 + co / 4;
+        else R = hl + co / 4;
+        const num = b.close - q.close + (b.close - b.open) / 2 + (q.close - q.open) / 4;
+        acc += R ? ((50 * num) / R) * (Math.max(hc, lc) / 0.5) : 0;
+        return acc;
+      }),
+    };
+  },
   cks: () => {
     const a = ATR(10);
     const fh = HIGHEST(H, 10).map((x, i) => x - a[i]),

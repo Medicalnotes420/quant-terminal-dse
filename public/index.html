@@ -25,6 +25,10 @@
           />
         </svg>
       </div>
+      <button id="backBtn" class="tb" title="Back to the previous share" disabled>
+        <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></svg
+        ><span>Back</span>
+      </button>
       <button
         id="symbolBtn"
         class="tb symbol-btn"
@@ -41,6 +45,13 @@
         title="Any timeframe: 1s, 7m, 2h, 3D, 2W, 3M"
         size="4"
       />
+      <select id="tfMenu" class="tb" title="Intervals">
+        <option value="">Intervals</option>
+        <optgroup label="Minutes"><option value="1m">1 minute</option><option value="3m">3 minutes</option><option value="5m">5 minutes</option><option value="15m">15 minutes</option><option value="30m">30 minutes</option><option value="45m">45 minutes</option></optgroup>
+        <optgroup label="Hours"><option value="1h">1 hour</option><option value="2h">2 hours</option><option value="3h">3 hours</option><option value="4h">4 hours</option></optgroup>
+        <optgroup label="Days"><option value="1D">1 day</option><option value="1W">1 week</option><option value="2W">2 weeks</option><option value="3W">3 weeks</option></optgroup>
+        <optgroup label="Months"><option value="1M">1 month</option><option value="3M">3 months</option><option value="6M">6 months</option><option value="12M">12 months</option></optgroup>
+      </select>
       <div class="sep"></div>
       <select id="chartType" class="tb" title="Chart type"></select>
       <button id="compareBtn" class="tb" title="Compare symbols">
@@ -117,10 +128,11 @@
         </svg>
       </button>
       <button id="settingsBtn" class="tb icon" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
-    <button id="themeBtn" class="tb icon" title="Light / dark">
+    <button id="themeBtn" class="tb" title="Light / dark">
         <svg viewBox="0 0 24 24">
           <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />
-        </svg>
+        </svg
+        ><span id="themeLabel">Dark</span>
       </button>
       <span id="status" class="status" title="Data status"></span>
       </div>
@@ -148,6 +160,7 @@
           <button id="gotoBtn" title="Go to a date"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M8 3v4M16 3v4" /></svg>Go to</button>
           <input type="date" id="gotoDate" class="goto-date" aria-label="Go to date" tabindex="-1" />
           <div class="rb-right">
+            <span id="clock" class="clock" title="Current time in the chart time zone"></span>
             <select id="tzSel" title="Time zone of the time axis (matters for intraday bars)"></select>
             <button id="pctBtn" title="Show price change in percent">%</button>
             <button id="logBtn" title="Logarithmic price scale">Log</button>

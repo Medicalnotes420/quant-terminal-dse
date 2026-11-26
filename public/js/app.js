@@ -564,15 +564,24 @@ class App {
       document.documentElement.dataset.theme = this.settings.theme;
       this.panes.forEach((p) => p.applyTheme());
       this.panels.onTheme?.();
+      this.syncToolbar();
       this.persist();
     };
     $("#settingsBtn").onclick = () => this.openSettings();
+    $("#backBtn").onclick = () => this.goBack();
+    const menu = $("#tfMenu");
+    menu.onchange = () => {
+      if (menu.value) this.setTf(menu.value);
+      menu.value = "";
+    };
   }
 
   syncToolbar() {
     const p = this.active;
     if (!p) return;
     $("#symbolLabel").textContent = ticker(p.cfg.symbol);
+    $("#backBtn").disabled = !this.symBack?.length;
+    $("#themeLabel").textContent = this.settings.theme === "dark" ? "Dark" : "Light";
     this.syncFavorite();
     $("#symbolBtn").title =
       `${p.cfg.symbol} — change symbol (or just start typing)`;
@@ -590,6 +599,11 @@ class App {
     $("#replayBtn").classList.toggle("on", !!p.replay);
   }
 
+  goBack() {
+    const prev = this.symBack?.pop();
+    if (prev) this.setSymbol(prev, this.active, true);
+  }
+
   setTf(tf) {
     this.active.cfg.tf = tf;
     this.active.load();
@@ -597,7 +611,12 @@ class App {
     this.persist();
   }
 
-  setSymbol(sym, pane = this.active) {
+  setSymbol(sym, pane = this.active, fromBack = false) {
+    // remember where we came from, for the Back button
+    if (!fromBack && pane?.cfg.symbol && pane.cfg.symbol !== sym) {
+      (this.symBack ||= []).push(pane.cfg.symbol);
+      if (this.symBack.length > 30) this.symBack.shift();
+    }
     const targets = this.settings.syncSymbol ? this.panes : [pane];
     for (const p of targets) {
       p.cfg.symbol = sym;
@@ -688,6 +707,12 @@ class App {
     const spans = [["5d", 5], ["1m", 31], ["3m", 92], ["6m", 183], ["1y", 365], ["5y", 1826], ["All", null]];
     const bar = $("#rangeBar");
     bar.insertAdjacentHTML("afterbegin", spans.map(([t, d]) => `<button data-days="${d}">${t}</button>`).join(""));
+    // the time in the chart's time zone, ticking beside the zone picker
+    const tick = () => {
+      $("#clock").textContent = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: this.settings.utc ? "UTC" : undefined });
+    };
+    tick();
+    setInterval(tick, 1000);
     const off = -new Date().getTimezoneOffset() / 60;
     const tz = $("#tzSel");
     tz.innerHTML = `<option value="0">UTC${off >= 0 ? "+" : ""}${off}</option><option value="1">UTC</option>`;
