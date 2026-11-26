@@ -95,6 +95,10 @@ class App {
     };
     this.state.settings = this.settings;
     for (const p of this.state.panes) if (!isDse(p.symbol)) p.symbol = "DSE:DSEX";
+    // ?symbol=DSE:AL-HAJTEX opens that share on the first chart
+    const want = new URLSearchParams(location.search).get("symbol");
+    if (want && isDse(want)) this.state.panes[0].symbol = want;
+    for (const k of ["magnet", "lockDrawings", "hideDrawings"]) this[k] = !!this.settings[k];
     for (const [name, list] of Object.entries(this.state.watchlists)) {
       const kept = list.filter(isDse);
       this.state.watchlists[name] = kept.length ? kept : [...DEFAULT_WATCHLISTS.Main];
@@ -221,7 +225,7 @@ class App {
       };
       const pane = new ChartPane(this, el, base);
       this.panes.push(pane);
-      pane.load();
+      pane.load().then(() => this.span !== undefined && pane.setSpan(this.span));
     }
     [...grid.children].forEach((el) => {
       if (!this.panes.some((p) => p.el === el)) el.remove();
@@ -551,6 +555,7 @@ class App {
       const b = e.target.closest("button");
       if (!b) return;
       const days = b.dataset.days === "null" ? null : Number(b.dataset.days);
+      this.span = days; // charts opened later in a bigger layout start on the same span
       for (const p of this.settings.syncSymbol ? this.panes : [this.active]) p?.setSpan(days);
     };
   }
@@ -579,6 +584,8 @@ class App {
       '<hr><button data-act="alert"title="Alert when price crosses the selected line"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20h4"/></svg></button>' +
       '<button data-act="delete" title="Delete selected drawing (Delete key)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>' +
       '<button data-act="clear" title="Remove all drawings on this symbol"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></svg></button>';
+    for (const [act, flag] of [["magnet", "magnet"], ["lock", "lockDrawings"], ["hide", "hideDrawings"]])
+      bar.querySelector(`[data-act="${act}"]`).classList.toggle("active", !!this[flag]);
     bar.onclick = (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -587,6 +594,8 @@ class App {
       const flag = { magnet: "magnet", lock: "lockDrawings", hide: "hideDrawings" }[b.dataset.act];
       if (flag) {
         this[flag] = !this[flag];
+        this.settings[flag] = this[flag];
+        this.persist();
         b.classList.toggle("active", this[flag]);
         for (const p of this.panes) {
           if (flag !== "magnet") p.drawings.selected = null;

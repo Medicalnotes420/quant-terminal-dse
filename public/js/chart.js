@@ -269,6 +269,37 @@ export class ChartPane {
       }
       this.drawings.update();
     });
+    // Drag a drawing: grab a handle to move that point, or the line itself to move the whole drawing.
+    this.chartEl.addEventListener("mousedown", (e) => {
+      if (this.app.tool !== "cursor" || e.button !== 0) return;
+      const p = domP(e);
+      const start = this.pointAt(p);
+      const d = this.drawings;
+      const item = start && d.hitTest(p.point.x, p.point.y);
+      if (!item) return;
+      d.selected = item;
+      const handle = item.type === "brush" ? -1 : item.points.findIndex((q) => Math.hypot(d.x(q.time) - p.point.x, d.y(q.price) - p.point.y) < 8);
+      this._drag = { item, handle, start, orig: structuredClone(item.points), moved: false };
+      this.chart.applyOptions({ handleScroll: false, handleScale: false });
+      e.stopPropagation();
+    }, true);
+    document.addEventListener("mousemove", (e) => {
+      const g = this._drag;
+      const cur = g && this.pointAt(domP(e));
+      if (!cur) return;
+      const dt = cur.time - g.start.time,
+        dp = cur.price - g.start.price;
+      g.item.points = g.orig.map((q, i) => (g.handle < 0 || g.handle === i ? { ...q, time: q.time + dt, price: q.price + dp } : q));
+      g.moved = true;
+      this.drawings.update();
+    });
+    document.addEventListener("mouseup", () => {
+      const g = this._drag;
+      if (!g) return;
+      this._drag = null;
+      this.chart.applyOptions({ handleScroll: true, handleScale: true });
+      if (g.moved) this.app.saveDrawings(this.cfg.symbol, this.drawings.items);
+    });
     this.drawings = new DrawingLayer(this);
     this.makeMainSeries();
   }
@@ -1210,6 +1241,13 @@ export class ChartPane {
       const item = d.temp;
       delete item.done;
       d.temp = null;
+      if (item.type === "zoom") {
+        const [l1, l2] = item.points.map((q) => this.logicalOf(q.time)).sort((m, n) => m - n);
+        d.update();
+        this.app.setTool("cursor");
+        if (l2 - l1 >= 2) this.chart.timeScale().setVisibleLogicalRange({ from: l1, to: l2 });
+        return;
+      }
       if (item.type === "text") {
         const text = prompt("Note text:", "");
         if (!text) {

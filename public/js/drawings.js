@@ -88,6 +88,12 @@ export const TOOLS = [
     icon: '<path d="M4 18c3-8 5 2 8-6s4 0 8-6"/>',
   },
   {
+    id: "zoom",
+    label: "Zoom in (click two corners)",
+    points: 2,
+    icon: '<circle cx="10" cy="10" r="6"/><path d="M15 15l5 5M10 7v6M7 10h6"/>',
+  },
+  {
     id: "text",
     label: "Text note",
     points: 1,
@@ -274,6 +280,7 @@ export class DrawingLayer {
         }
         break;
       }
+      case "zoom":
       case "rect": {
         ctx.globalAlpha = 0.12;
         ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
