@@ -128,7 +128,10 @@
       <section class="center">
         <div id="grid" class="grid"></div>
         <div id="rangeBar" class="rangebar" title="Zoom the chart to a time span (daily data, so no intraday)">
+          <button id="gotoBtn" title="Go to a date"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M8 3v4M16 3v4" /></svg>Go to</button>
+          <input type="date" id="gotoDate" class="goto-date" aria-label="Go to date" tabindex="-1" />
           <div class="rb-right">
+            <select id="tzSel" title="Time zone of the time axis (matters for intraday bars)"></select>
             <button id="pctBtn" title="Show price change in percent">%</button>
             <button id="logBtn" title="Logarithmic price scale">Log</button>
             <button id="autoBtn" title="Fit the price scale to the bars on screen">Auto</button>
@@ -157,6 +160,7 @@
           <button data-tab="details">Details</button>
           <button data-tab="patterns">Patterns</button>
           <button data-tab="alerts">Alerts</button>
+          <button data-tab="objects">Objects</button>
           <div class="spacer"></div>
           <button id="sideToggle" class="icon" title="Minimize the side panel" aria-label="Minimize the side panel"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg></button>
         </div>
@@ -170,6 +174,7 @@
         <button data-tab="details" title="Details"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg></button>
         <button data-tab="patterns" title="Patterns"><svg viewBox="0 0 24 24"><path d="M3 17l5-8 4 5 4-9 5 8"/></svg></button>
         <button data-tab="alerts" title="Alerts"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20h4"/></svg></button>
+        <button data-tab="objects" title="Object tree: the drawings on this chart"><svg viewBox="0 0 24 24"><path d="M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/></svg></button>
       </nav>
     </div>
 

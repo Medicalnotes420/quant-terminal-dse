@@ -10,6 +10,7 @@ import {
   ticker,
   exchange,
 } from "./api.js";
+import { TOOL_BY_ID } from "./drawings.js";
 import { INDICATORS, BY_ID, registerIndicator } from "../lib/indicators.js";
 import { renderNews, renderSeasonals, renderFinancials } from "./research.js";
 import { mountQuantChecks } from "./quantui.js";
@@ -255,6 +256,7 @@ export function initPanels(app) {
       patterns: renderPatternsTab,
       alerts: renderAlerts,
       calendar: renderCalendar,
+      objects: renderObjects,
       news: () => renderNews(side, app),
     })[sideTab]();
   const renderBottom = () => {
@@ -269,6 +271,36 @@ export function initPanels(app) {
         editor: renderEditor,
       })[bottomTab]();
   };
+
+  // ======================= OBJECT TREE =======================
+  // The drawings on the active chart's share: click one to select it, or use the bin to remove it.
+  function renderObjects() {
+    const d = app.active?.drawings;
+    const items = d?.items || [];
+    const bin = '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+    side.innerHTML = `<div id="obList">${
+      items
+        .map((it, i) => {
+          const p = it.points[it.points.length - 1];
+          return `<div class="wl-row ob-row ${it === d.selected ? "current" : ""}" data-i="${i}"><span class="sym">${esc(TOOL_BY_ID[it.type]?.label || it.type)}${it.text ? ` · ${esc(it.text.slice(0, 18))}` : ""}</span><span class="px">${fmtPrice(p.price)}</span><span class="ex">${new Date(p.time * 1000).toISOString().slice(0, 10)}</span><button class="x" title="Remove this drawing">${bin}</button></div>`;
+        })
+        .join("") || '<div class="pad hint-text">No drawings on this chart yet. Pick a tool on the left and draw.</div>'
+    }</div>`;
+    $("#obList").onclick = (e) => {
+      const it = d.items[Number(e.target.closest(".ob-row")?.dataset.i)];
+      if (!it) return;
+      if (e.target.closest(".x")) {
+        d.items = d.items.filter((x) => x !== it);
+        if (d.selected === it) d.selected = null;
+        d.update();
+        app.saveDrawings(app.active.cfg.symbol, d.items);
+      } else {
+        d.selected = it;
+        d.update();
+        renderObjects();
+      }
+    };
+  }
 
   // ======================= WATCHLIST =======================
   let quotes = {};

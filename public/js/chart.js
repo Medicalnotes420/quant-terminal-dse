@@ -210,6 +210,7 @@ export class ChartPane {
       localization: { priceFormatter: (p) => fmtPrice(p) },
     });
     this.chart.subscribeCrosshairMove((p) => this.onCrosshair(p));
+    this.chart.timeScale().subscribeVisibleLogicalRangeChange(() => this.updateHiLo());
     this.chart.subscribeClick((p) => {
       if (this.app.tool !== "cursor") return;
       // a click on a chart pattern selects it; a click anywhere else lets go of it and carries on as before
@@ -634,6 +635,7 @@ export class ChartPane {
     this.renderCompare();
     this.renderIndicators();
     this.drawings.update();
+    this.updateHiLo();
     if (resetView && this.shown.length)
       this.chart.timeScale().setVisibleLogicalRange({
         from: Math.max(0, this.shown.length - 160),
@@ -1263,6 +1265,39 @@ export class ChartPane {
       if (!this.app.settings.stayInDrawMode) this.app.setTool("cursor");
     }
     d.update();
+  }
+
+  // "High" and "Low" lines at the extremes of the bars on screen, like BullBD's labels.
+  updateHiLo() {
+    if (!this.main) return;
+    for (const l of this.hiLoLines || []) {
+      try {
+        this.main.removePriceLine(l);
+      } catch {
+        /* the series was rebuilt; its lines went with it */
+      }
+    }
+    this.hiLoLines = [];
+    const r = this.chart.timeScale().getVisibleLogicalRange();
+    if (!r || !this.shown.length || this.cfg.marks === false) return;
+    let hi = -Infinity,
+      lo = Infinity;
+    for (let i = Math.max(0, Math.floor(r.from)); i <= Math.min(this.shown.length - 1, Math.ceil(r.to)); i++) {
+      hi = Math.max(hi, this.shown[i].high);
+      lo = Math.min(lo, this.shown[i].low);
+    }
+    if (!Number.isFinite(hi) || !Number.isFinite(lo)) return;
+    const line = (price, title) =>
+      this.main.createPriceLine({ price, title, color: css("--muted"), lineWidth: 1, lineStyle: LW.LineStyle.Dotted, axisLabelVisible: true });
+    this.hiLoLines = [line(hi, "High"), line(lo, "Low")];
+  }
+
+  goToDate(iso) {
+    const l = this.logicalOf(Date.parse(`${iso}T00:00:00Z`) / 1000);
+    if (l == null) return;
+    const r = this.chart.timeScale().getVisibleLogicalRange();
+    const w = r ? r.to - r.from : 160;
+    this.chart.timeScale().setVisibleLogicalRange({ from: l - w / 2, to: l + w / 2 });
   }
 
   // Zoom in (f < 1) or out (f > 1), keeping the right-hand edge where it is.

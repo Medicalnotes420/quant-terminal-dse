@@ -155,6 +155,8 @@ class App {
       if (p.cfg.symbol === symbol && p.drawings.items !== items)
         p.drawings.setItems(this.getDrawings(symbol));
     this.persist();
+    // keep the Objects tab in step when it is open
+    if (document.querySelector("#sideTabs .active")?.dataset.tab === "objects") this.panels?.showSide("objects");
   }
 
   // ---------- custom indicators ----------
@@ -579,6 +581,21 @@ class App {
     const spans = [["5d", 5], ["1m", 31], ["3m", 92], ["6m", 183], ["1y", 365], ["5y", 1826], ["All", null]];
     const bar = $("#rangeBar");
     bar.insertAdjacentHTML("afterbegin", spans.map(([t, d]) => `<button data-days="${d}">${t}</button>`).join(""));
+    const off = -new Date().getTimezoneOffset() / 60;
+    const tz = $("#tzSel");
+    tz.innerHTML = `<option value="0">UTC${off >= 0 ? "+" : ""}${off}</option><option value="1">UTC</option>`;
+    tz.value = this.settings.utc ? "1" : "0";
+    tz.onchange = () => {
+      this.settings.utc = tz.value === "1";
+      this.persist();
+      this.panes.forEach((p) => p.load({ keepView: true }));
+    };
+    $("#gotoBtn").onclick = () => {
+      const i = $("#gotoDate");
+      i.value = "";
+      i.showPicker ? i.showPicker() : i.click();
+    };
+    $("#gotoDate").onchange = (e) => e.target.value && this.active?.goToDate(e.target.value);
     $("#pctBtn").onclick = () => {
       this.active.cfg.pct = !this.active.cfg.pct;
       this.active.render(false);

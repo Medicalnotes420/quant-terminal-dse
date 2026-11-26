@@ -1207,3 +1207,11 @@ body { font-family: Roboto, -apple-system, "Helvetica Neue", Helvetica, Arial, "
 .sh-head, .wl-row.sh-row { grid-template-columns: minmax(92px, 1.5fr) minmax(38px, .9fr) minmax(54px, 1fr) minmax(36px, .9fr); gap: 4px; padding: 0 8px; font-size: 12px; }
 .sh-head button:first-child { padding-left: 22px; }
 .sh-head button { white-space: nowrap; padding: 2px 0; }
+
+/* bottom bar: Go to date and time zone */
+.rangebar #gotoBtn { display: inline-flex; align-items: center; gap: 4px; }
+.rangebar #gotoBtn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rangebar .goto-date { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.rangebar #tzSel { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; padding: 3px 2px; }
+.rangebar #tzSel:hover { color: var(--text); }
+.ob-row { grid-template-columns: minmax(0, 1.6fr) 1fr 1fr 24px; }
