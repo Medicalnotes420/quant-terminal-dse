@@ -747,12 +747,12 @@ class App {
     bar.innerHTML =
       [["cursor", "eraser"]].map(group).join("") + "<hr>" +
       [
-        ["trend", "arrow", "info", "angle", "ray", "extended", "hline", "hray", "vline", "crossline", "channel"],
+        ["trend", "arrow", "info", "angle", "ray", "extended", "hline", "hray", "vline", "crossline", "regression", "flat", "channel"],
         ["fib", "fibext"],
-        ["brush", "highlighter", "rect", "circle", "ellipse", "triangle"],
-        ["text", "note", "pricelabel", "arrowup", "arrowdown", "flag"],
-        ["xabcd", "abcd"],
-        ["long", "short", "daterange", "pricerange", "daterangeprice", "measure"],
+        ["brush", "highlighter", "rect", "rotated", "circle", "ellipse", "triangle", "polyline"],
+        ["text", "note", "callout", "signpost", "pricelabel", "pricenote", "arrowup", "arrowdown", "flag"],
+        ["xabcd", "abcd", "headshoulders", "cyclic", "timecycles"],
+        ["long", "short", "forecast", "daterange", "pricerange", "daterangeprice", "measure"],
       ].map(group).join("") +
       "<hr>" + item(T.zoom) +
       '<button data-act="magnet" title="Magnet: snap drawing points to the nearest open, high, low or close"><svg viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4zM6 8h4M14 8h4"/></svg></button>' +
@@ -816,6 +816,15 @@ class App {
     document
       .querySelectorAll("#drawbar [data-tool]")
       .forEach((b) => b.classList.toggle("active", b.dataset.tool === tool));
+    // a tool picked by a shortcut shows on its group's button
+    const inFly = document.querySelector(`#drawbar .dg-fly [data-tool="${tool}"]`);
+    if (inFly) {
+      const main = inFly.closest(".dg").firstElementChild;
+      main.dataset.tool = tool;
+      main.title = inFly.title;
+      main.innerHTML = inFly.querySelector("svg").outerHTML;
+      main.classList.add("active");
+    }
     for (const p of this.panes) p.setInteractive(tool === "cursor");
     document.body.style.cursor = tool === "cursor" ? "" : "crosshair";
   }
@@ -1177,6 +1186,13 @@ class App {
       }
       // Alt+1..4 pick 1h, 1D, 1W, 1M in the toolbar's order; Alt+[ and Alt+] step back and forward through them.
       // (Plain letters are taken: typing starts a symbol search.)
+      // Alt+T trend line, Alt+H horizontal line, Alt+J horizontal ray, Alt+V vertical line, Alt+C cross line, Alt+F fib retracement (BullBD's shortcuts)
+      const SHORTCUT_TOOLS = { KeyT: "trend", KeyH: "hline", KeyJ: "hray", KeyV: "vline", KeyC: "crossline", KeyF: "fib" };
+      if (e.altKey && !typing && !e.ctrlKey && !e.metaKey && SHORTCUT_TOOLS[e.code]) {
+        e.preventDefault();
+        this.setTool(this.tool === SHORTCUT_TOOLS[e.code] ? "cursor" : SHORTCUT_TOOLS[e.code]);
+        return;
+      }
       if (e.altKey && !typing && !e.ctrlKey && !e.metaKey && this.active) {
         const digit = /^Digit([1-9])$/.exec(e.code)?.[1];
         let tf = digit ? TF_QUICK[Number(digit) - 1] : null;

@@ -112,6 +112,17 @@ export const TOOLS = [
   { id: "daterange", label: "Date range", points: 2, icon: '<path d="M5 5v14M19 5v14M5 12h14M8 9l-3 3 3 3M16 9l3 3-3 3"/>' },
   { id: "pricerange", label: "Price range", points: 2, icon: '<path d="M5 5h14M5 19h14M12 5v14M9 8l3-3 3 3M9 16l3 3 3-3"/>' },
   { id: "daterangeprice", label: "Date and price range", points: 2, icon: '<rect x="4" y="5" width="16" height="14"/><path d="M4 12h16M12 5v14"/>' },
+  { id: "regression", label: "Regression trend", points: 2, icon: '<path d="M4 17L20 8M4 12L20 3M4 22L20 13" stroke-dasharray="2 2"/><path d="M4 17L20 8"/>' },
+  { id: "flat", label: "Flat top/bottom", points: 3, icon: '<path d="M4 19L18 8M4 6h14"/>' },
+  { id: "rotated", label: "Rotated rectangle", points: 3, icon: '<path d="M4 14l10-8 6 6-10 8z"/>' },
+  { id: "polyline", label: "Polyline (double-click to finish)", points: 50, icon: '<path d="M4 18l5-9 5 6 6-10"/>' },
+  { id: "callout", label: "Callout", points: 2, icon: '<path d="M5 19l6-7M11 12h8V5h-8z"/>' },
+  { id: "signpost", label: "Signpost", points: 1, icon: '<path d="M7 21V4M7 5h11l-2 3 2 3H7"/>' },
+  { id: "pricenote", label: "Price note", points: 1, icon: '<path d="M4 20l7-7M11 13h9V6h-9z"/>' },
+  { id: "headshoulders", label: "Head and shoulders", points: 7, icon: '<path d="M3 18l3-6 3 3 3-9 3 9 3-3 3 6M4 15h16"/>' },
+  { id: "cyclic", label: "Cyclic lines", points: 2, icon: '<path d="M5 4v16M11 4v16M17 4v16"/>' },
+  { id: "timecycles", label: "Time cycles", points: 2, icon: '<path d="M3 16a4 5 0 0 1 8 0M11 16a4 5 0 0 1 8 0"/>' },
+  { id: "forecast", label: "Forecast", points: 2, icon: '<path d="M4 18l8-6 7-7M19 5h-6M19 5v6"/><circle cx="12" cy="12" r="1.5"/>' },
   {
     id: "text",
     label: "Text note",
@@ -247,6 +258,164 @@ export class DrawingLayer {
       case "trend":
         line(a.x, a.y, b.x, b.y);
         break;
+      case "regression": {
+        const T = this.pane.shown,
+          ts = this.pane.chart.timeScale();
+        let i1 = Math.round(this.pane.logicalOf(a.time)),
+          i2 = Math.round(this.pane.logicalOf(b.time));
+        if (i1 > i2) [i1, i2] = [i2, i1];
+        i1 = Math.max(0, i1);
+        i2 = Math.min(T.length - 1, i2);
+        if (i2 - i1 < 2) {
+          line(a.x, a.y, b.x, b.y);
+          break;
+        }
+        const n = i2 - i1 + 1;
+        let sx = 0,
+          sy = 0,
+          sxx = 0,
+          sxy = 0;
+        for (let i = i1; i <= i2; i++) {
+          const x = i - i1,
+            y = T[i].close;
+          sx += x;
+          sy += y;
+          sxx += x * x;
+          sxy += x * y;
+        }
+        const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx),
+          icpt = (sy - slope * sx) / n;
+        let ss = 0;
+        for (let i = i1; i <= i2; i++) ss += (T[i].close - (icpt + slope * (i - i1))) ** 2;
+        const sd = Math.sqrt(ss / n),
+          xa = ts.logicalToCoordinate(i1),
+          xb = ts.logicalToCoordinate(i2),
+          m1 = icpt,
+          m2 = icpt + slope * (i2 - i1);
+        const yy = (v) => this.y(v);
+        ctx.globalAlpha = 0.08;
+        ctx.beginPath();
+        ctx.moveTo(xa, yy(m1 + 2 * sd));
+        ctx.lineTo(xb, yy(m2 + 2 * sd));
+        ctx.lineTo(xb, yy(m2 - 2 * sd));
+        ctx.lineTo(xa, yy(m1 - 2 * sd));
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        line(xa, yy(m1), xb, yy(m2));
+        ctx.setLineDash([5, 4]);
+        line(xa, yy(m1 + 2 * sd), xb, yy(m2 + 2 * sd));
+        line(xa, yy(m1 - 2 * sd), xb, yy(m2 - 2 * sd));
+        ctx.setLineDash([]);
+        break;
+      }
+      case "flat": {
+        line(a.x, a.y, b.x, b.y);
+        if (!c) break;
+        line(a.x, c.y, b.x, c.y);
+        ctx.globalAlpha = 0.1;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(b.x, c.y);
+        ctx.lineTo(a.x, c.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "rotated": {
+        if (!c) {
+          line(a.x, a.y, b.x, b.y);
+          break;
+        }
+        const ux = b.x - a.x,
+          uy = b.y - a.y,
+          len = Math.hypot(ux, uy) || 1;
+        const nx = -uy / len,
+          ny = ux / len,
+          off = (c.x - a.x) * nx + (c.y - a.y) * ny;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(b.x + nx * off, b.y + ny * off);
+        ctx.lineTo(a.x + nx * off, a.y + ny * off);
+        ctx.closePath();
+        ctx.globalAlpha = 0.12;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.stroke();
+        break;
+      }
+      case "polyline":
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.stroke();
+        break;
+      case "callout":
+        line(a.x, a.y, b.x, b.y);
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        label(d.text || "Callout", b.x, b.y, "left", color);
+        break;
+      case "signpost":
+        line(a.x, a.y, a.x, a.y - 34);
+        label(d.text || "Signpost", a.x + 4, a.y - 34, "left", "#b8860b");
+        break;
+      case "pricenote":
+        line(a.x, a.y, a.x + 14, a.y - 14);
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        label(price(a.price), a.x + 14, a.y - 14, "left", "#b8860b");
+        break;
+      case "headshoulders": {
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.stroke();
+        if (pts.length >= 5) {
+          const [e1, e2] = extend(pts[2], pts[4], true);
+          ctx.setLineDash([5, 4]);
+          line(e1.x, e1.y, e2.x, e2.y);
+          ctx.setLineDash([]);
+        }
+        [[1, "Left shoulder"], [3, "Head"], [5, "Right shoulder"]].forEach(([i, t]) => pts[i] && label(t, pts[i].x, pts[i].y - 12, "center", color));
+        break;
+      }
+      case "cyclic":
+      case "timecycles": {
+        const w = b.x - a.x;
+        if (Math.abs(w) < 3) break;
+        const lo = Math.min((0 - a.x) / w, (size.width - a.x) / w),
+          hi = Math.max((0 - a.x) / w, (size.width - a.x) / w);
+        for (let k = Math.max(Math.floor(lo), -200); k <= Math.min(Math.ceil(hi), 200); k++) {
+          const x = a.x + k * w;
+          if (d.type === "cyclic") line(x, 0, x, size.height);
+          else {
+            ctx.beginPath();
+            ctx.ellipse(x + w / 2, a.y, Math.abs(w) / 2, Math.abs(w) / 3, 0, Math.PI, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+        break;
+      }
+      case "forecast": {
+        const up = b.price >= a.price,
+          dp = b.price - a.price,
+          pct = a.price ? (dp / a.price) * 100 : 0;
+        const bars = Math.round(this.pane.logicalOf(b.time) - this.pane.logicalOf(a.time));
+        ctx.setLineDash([6, 4]);
+        line(a.x, a.y, b.x, b.y);
+        ctx.setLineDash([]);
+        ctx.fillStyle = up ? "#089981" : "#f23645";
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        label(`${dp >= 0 ? "+" : ""}${price(dp)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%) · ${bars} bars`, b.x + 8, b.y, "left", up ? "#089981" : "#f23645");
+        ctx.fillStyle = color;
+        break;
+      }
       case "arrow": {
         line(a.x, a.y, b.x, b.y);
         const ang = Math.atan2(b.y - a.y, b.x - a.x),
@@ -596,8 +765,14 @@ export class DrawingLayer {
       else if (d.type === "hray")
         dist = x >= a.x - 4 ? Math.abs(y - a.y) : Infinity;
       else if (d.type === "vline") dist = Math.abs(x - a.x);
-      else if (["brush", "highlighter", "xabcd", "abcd"].includes(d.type))
+      else if (["brush", "highlighter", "xabcd", "abcd", "polyline", "headshoulders"].includes(d.type))
         dist = Math.min(Infinity, ...pts.slice(1).map((q, i) => segDist(pts[i], q)));
+      else if (d.type === "cyclic" || d.type === "timecycles") {
+        const w = Math.abs(b.x - a.x) || 1;
+        const r = (((x - a.x) % w) + w) % w;
+        dist = d.type === "cyclic" ? Math.min(r, w - r) : Math.abs(y - a.y) < w / 3 ? 3 : Infinity;
+      } else if (d.type === "signpost") dist = Math.abs(x - a.x) < 10 && y >= a.y - 40 && y <= a.y + 4 ? 0 : Infinity;
+      else if (d.type === "pricenote") dist = x >= a.x - 4 && x <= a.x + 80 && y >= a.y - 24 && y <= a.y + 4 ? 0 : Infinity;
       else if (d.type === "crossline") dist = Math.min(Math.abs(y - a.y), Math.abs(x - a.x));
       else if (d.type === "circle" || d.type === "ellipse") {
         const circ = d.type === "circle";
@@ -616,7 +791,7 @@ export class DrawingLayer {
           x >= a.x - 4 && x <= a.x + 120 && Math.abs(y - a.y) < 12
             ? 0
             : Infinity;
-      else if (["rect", "fib", "fibext", "measure", "long", "short", "daterangeprice"].includes(d.type)) {
+      else if (["rect", "fib", "fibext", "measure", "long", "short", "daterangeprice", "flat", "rotated"].includes(d.type)) {
         const inside =
           x >= Math.min(a.x, b.x) - 4 &&
           x <= Math.max(a.x, b.x, a.x + 40) + 4 &&
