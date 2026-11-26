@@ -256,11 +256,28 @@ class App {
       this.applySide();
       if (save) this.persist();
     };
+    // The icon rail (like BullBD's): click an icon to open its tab; click the open tab's icon to collapse the panel.
+    const rail = $("#sideRail");
+    const sync = () => {
+      const cur = document.querySelector("#sideTabs .active")?.dataset.tab;
+      rail.querySelectorAll("button").forEach((b) => b.classList.toggle("active", !this.state.sideCollapsed && b.dataset.tab === cur));
+    };
     const collapse = (on) => {
       this.state.sideCollapsed = on;
       this.applySide();
       this.persist();
+      sync();
     };
+    rail.onclick = (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      const cur = document.querySelector("#sideTabs .active")?.dataset.tab;
+      if (!this.state.sideCollapsed && cur === b.dataset.tab) return collapse(true);
+      if (cur !== b.dataset.tab) document.querySelector(`#sideTabs [data-tab="${b.dataset.tab}"]`)?.click();
+      collapse(false);
+    };
+    new MutationObserver(sync).observe($("#sideTabs"), { subtree: true, attributes: true, attributeFilter: ["class"] });
+    sync();
     $("#sideToggle").onclick = () => collapse(true);
     $("#sideOpen").onclick = () => collapse(false);
     const bar = $("#sideResizer");
@@ -571,11 +588,15 @@ class App {
 
   buildDrawbar() {
     const bar = $("#drawbar");
+    // Tools sit in groups like BullBD's toolbar: the button shows the last tool used, a flyout lists the rest.
+    const T = Object.fromEntries(TOOLS.map((t) => [t.id, t]));
+    const item = (t, label = "") => `<button data-tool="${t.id}" title="${t.label}"><svg viewBox="0 0 24 24">${t.icon}</svg>${label}</button>`;
+    const group = (ids) =>
+      `<div class="dg">${item(T[ids[0]])}<div class="dg-fly">${ids.map((id) => item(T[id], `<span>${T[id].label}</span>`)).join("")}</div></div>`;
     bar.innerHTML =
-      TOOLS.map(
-        (t, i) =>
-          `${i === 1 ? "<hr>" : ""}<button data-tool="${t.id}" title="${t.label}"><svg viewBox="0 0 24 24">${t.icon}</svg></button>`,
-      ).join("") +
+      item(T.cursor) + "<hr>" +
+      [["trend", "ray", "extended", "hline", "hray", "vline", "channel"], ["fib", "xabcd"], ["brush", "rect"], ["long", "short", "measure"]].map(group).join("") +
+      item(T.text) + item(T.zoom) +
       '<hr><button data-act="magnet" title="Magnet: snap drawing points to the nearest open, high, low or close"><svg viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4zM6 8h4M14 8h4"/></svg></button>' +
       '<button data-act="lock" title="Lock drawings: stops them being selected or deleted"><svg viewBox="0 0 24 24"><path d="M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3"/></svg></button>' +
       '<button data-act="hide" title="Hide all drawings"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M4 20L20 4"/></svg></button>' +
@@ -589,6 +610,17 @@ class App {
     bar.onclick = (e) => {
       const b = e.target.closest("button");
       if (!b) return;
+      const fly = b.closest(".dg-fly");
+      if (fly) {
+        // picking from a flyout puts that tool on the group's button and closes the flyout
+        const g = fly.parentElement;
+        const main = g.firstElementChild;
+        main.dataset.tool = b.dataset.tool;
+        main.title = b.title;
+        main.innerHTML = b.querySelector("svg").outerHTML;
+        g.classList.add("shut");
+        g.onmouseleave = () => g.classList.remove("shut");
+      }
       if (b.dataset.tool)
         this.setTool(this.tool === b.dataset.tool ? "cursor" : b.dataset.tool);
       const flag = { magnet: "magnet", lock: "lockDrawings", hide: "hideDrawings" }[b.dataset.act];
