@@ -305,11 +305,11 @@ export class ChartPane {
     // a polyline has no fixed number of points: a double-click ends it
     this.chartEl.addEventListener("dblclick", () => {
       const t = this.drawings.temp;
-      if (t?.type !== "polyline") return;
+      if (!["polyline", "path"].includes(t?.type)) return;
       const pts = t.points.filter((p, i, all) => i === 0 || p.time !== all[i - 1].time || p.price !== all[i - 1].price);
       this.drawings.temp = null;
       if (pts.length > 1) {
-        const item = { id: t.id, type: "polyline", points: pts };
+        const item = { id: t.id, type: t.type, points: pts };
         this.drawings.items.push(item);
         this.drawings.selected = item;
         this.app.saveDrawings(this.cfg.symbol, this.drawings.items);
@@ -1290,7 +1290,7 @@ export class ChartPane {
         if (l2 - l1 >= 2) this.chart.timeScale().setVisibleLogicalRange({ from: l1, to: l2 });
         return;
       }
-      if (["text", "note", "callout", "signpost"].includes(item.type)) {
+      if (["text", "note", "callout", "signpost", "balloon"].includes(item.type)) {
         const text = prompt("Note text:", "");
         if (!text) {
           d.update();

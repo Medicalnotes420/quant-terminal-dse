@@ -774,11 +774,12 @@ class App {
       [["cursor", "eraser"]].map(group).join("") + "<hr>" +
       [
         ["trend", "arrow", "info", "angle", "ray", "extended", "hline", "hray", "vline", "crossline", "regression", "flat", "channel"],
-        ["fib", "fibext"],
-        ["brush", "highlighter", "rect", "rotated", "circle", "ellipse", "triangle", "polyline"],
-        ["text", "note", "callout", "signpost", "pricelabel", "pricenote", "arrowup", "arrowdown", "flag"],
-        ["xabcd", "abcd", "headshoulders", "cyclic", "timecycles"],
-        ["long", "short", "forecast", "daterange", "pricerange", "daterangeprice", "measure"],
+        ["fib", "fibext", "fibchannel", "fibtimezone", "trendfibtime", "fibcircles", "fibspiral", "fibarcs", "fibwedge", "fibfan", "gannbox", "gannsquare", "gannfan", "pitchfork", "schiff", "mschiff", "pitchfan"],
+        ["brush", "highlighter", "rect", "rotated", "circle", "ellipse", "triangle", "polyline", "path", "curve", "doublecurve", "arc"],
+        ["text", "note", "callout", "signpost", "balloon", "pricelabel", "pricenote", "arrowup", "arrowdown", "arrowleft", "arrowright", "flag"],
+        ["xabcd", "cypher", "abcd", "trianglepattern", "threedrives", "headshoulders", "elliottimpulse", "elliotttriangle", "elliotttriple", "elliottcorrection", "elliottdouble", "cyclic", "timecycles", "sine"],
+        ["long", "short", "forecast", "projection", "barspattern", "fixedvp", "daterange", "pricerange", "daterangeprice", "measure"],
+        ["emoji_star", "emoji_thumbsup", "emoji_thumbsdown", "emoji_warning", "emoji_check", "emoji_cross", "emoji_fire", "emoji_money", "emoji_rocket", "emoji_chartup", "emoji_chartdown", "emoji_bull", "emoji_bear", "emoji_eyes", "emoji_bell", "emoji_redflag"],
       ].map(group).join("") +
       "<hr>" + item(T.zoom) +
       '<button data-act="magnet" title="Magnet: snap drawing points to the nearest open, high, low or close"><svg viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4zM6 8h4M14 8h4"/></svg></button>' +

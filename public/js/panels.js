@@ -398,22 +398,46 @@ export function initPanels(app) {
   // takes it off, the Favorites list that is open (the same list as the Favorites tab).
   const COMPACT = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
   let shareRows = null, shareSort = { key: "ticker", dir: 1 }, shareQ = "", shareCat = "", shareSec = "";
+  // The All shares table: Columns and Filters drawers on its right edge, like BullBD's, and a reset button.
+  let shareShow = { price: true, changePct: true, volume: true, category: false, sector: false };
+  let shareChgMin = "", shareChgMax = "", shareVolMin = "", shareDrawer = "";
+  const SHARE_COLS = [
+    ["price", "LTP", "minmax(38px, .9fr)"],
+    ["changePct", "Chg(%)", "minmax(54px, 1fr)"],
+    ["volume", "Volume", "minmax(36px, .9fr)"],
+    ["category", "Cat.", "minmax(30px, .6fr)"],
+    ["sector", "Sector", "minmax(70px, 1.2fr)"],
+  ];
+  const shareFiltered = () => !!(shareCat || shareSec || shareChgMin !== "" || shareChgMax !== "" || shareVolMin !== "");
+  function resetShareView() {
+    shareShow = { price: true, changePct: true, volume: true, category: false, sector: false };
+    shareCat = shareSec = shareChgMin = shareChgMax = shareVolMin = "";
+    shareSort = { key: "ticker", dir: 1 };
+    drawDrawer();
+    drawShares();
+  }
   async function renderShares() {
-    side.innerHTML = `<div class="wl-head"><span class="hint-text" id="shNote">Loading…</span></div>
-      <div style="padding:8px"><input class="in" id="shQ" placeholder="Search shares" style="width:100%" value="${esc(shareQ)}"></div>
-      <div class="sh-filters"><label>Category<select class="in" id="shCat"></select></label><label>Sector<select class="in" id="shSec"></select></label></div>
-      <div class="sh-head">${[["ticker", "Symbol"], ["price", "LTP"], ["changePct", "Chg(%)"], ["volume", "Volume"]].map(([k, l]) => `<button data-k="${k}" data-l="${l}">${l}</button>`).join("")}</div>
-      <div id="shRows"></div>`;
+    side.innerHTML = `<div class="sh-wrap"><div class="sh-main">
+        <div class="wl-head"><span class="hint-text" id="shNote">Loading…</span></div>
+        <div style="padding:8px"><input class="in" id="shQ" placeholder="Search shares" style="width:100%" value="${esc(shareQ)}"></div>
+        <div class="sh-head" id="shHead"></div>
+        <div id="shRows"></div></div>
+      <div class="sh-tabs"><button data-d="cols">Columns</button><button data-d="filters">Filters</button></div>
+      <div class="sh-drawer hidden" id="shDrawer"></div></div>`;
     $("#shQ").oninput = (e) => {
       shareQ = e.target.value.trim().toUpperCase();
       drawShares();
     };
-    $("#shCat").onchange = (e) => ((shareCat = e.target.value), drawShares());
-    $("#shSec").onchange = (e) => ((shareSec = e.target.value), drawShares());
-    $(".sh-head").onclick = (e) => {
+    $(".sh-tabs").onclick = (e) => {
+      const d = e.target.dataset.d;
+      if (!d) return;
+      shareDrawer = shareDrawer === d ? "" : d;
+      drawDrawer();
+    };
+    $("#shHead").onclick = (e) => {
       const k = e.target.dataset.k;
       if (!k) return;
-      shareSort = { key: k, dir: shareSort.key === k ? -shareSort.dir : k === "ticker" ? 1 : -1 };
+      shareSort = { key: k, dir: shareSort.key === k ? -shareSort.dir : k === "ticker" || k === "category" || k === "sector" ? 1 : -1 };
       drawShares();
     };
     $("#shRows").onclick = (e) => {
@@ -436,33 +460,70 @@ export function initPanels(app) {
         return;
       }
     }
+    drawDrawer();
     drawShares();
+  }
+  function drawDrawer() {
+    const box = $("#shDrawer");
+    if (!box) return;
+    document.querySelectorAll(".sh-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.d === shareDrawer || (b.dataset.d === "filters" && shareFiltered())));
+    box.classList.toggle("hidden", !shareDrawer);
+    if (!shareDrawer) return;
+    const opts = (field, cur) => `<option value="">All</option>${[...new Set((shareRows || []).map((r) => r[field]).filter(Boolean))].sort().map((v) => `<option ${v === cur ? "selected" : ""}>${esc(v)}</option>`).join("")}`;
+    box.innerHTML =
+      (shareDrawer === "cols"
+        ? `<h4>Columns</h4><div class="sh-note">Symbol is always shown.</div>${SHARE_COLS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-col="${k}" ${shareShow[k] ? "checked" : ""}> ${l}</label>`).join("")}`
+        : `<h4>Filters</h4>
+          <label>Category<select class="in" id="shCat">${opts("category", shareCat)}</select></label>
+          <label>Sector<select class="in" id="shSec">${opts("sector", shareSec)}</select></label>
+          <label>Change % from<input class="in" id="shChgMin" type="number" step="0.1" value="${esc(shareChgMin)}"></label>
+          <label>Change % to<input class="in" id="shChgMax" type="number" step="0.1" value="${esc(shareChgMax)}"></label>
+          <label>Volume at least<input class="in" id="shVolMin" type="number" step="1000" value="${esc(shareVolMin)}"></label>`) +
+      '<button class="btn small" id="shReset">Reset columns and filters</button>';
+    box.querySelectorAll("[data-col]").forEach((el) => (el.onchange = () => ((shareShow[el.dataset.col] = el.checked), drawShares())));
+    const bind = (id, set) => {
+      const el = box.querySelector(id);
+      if (el) el.onchange = () => (set(el.value), drawShares(), drawDrawer());
+    };
+    bind("#shCat", (v) => (shareCat = v));
+    bind("#shSec", (v) => (shareSec = v));
+    bind("#shChgMin", (v) => (shareChgMin = v));
+    bind("#shChgMax", (v) => (shareChgMax = v));
+    bind("#shVolMin", (v) => (shareVolMin = v));
+    box.querySelector("#shReset").onclick = resetShareView;
   }
   function drawShares() {
     const box = $("#shRows");
     if (!box || !shareRows) return;
     const { key, dir } = shareSort, mine = new Set(wlSymbols()), cur = app.active?.cfg.symbol;
-    // the filter lists come from the data, so a category or sector that is not there is never offered
-    const opts = (field, cur) => `<option value="">All</option>${[...new Set(shareRows.map((r) => r[field]).filter(Boolean))].sort().map((v) => `<option ${v === cur ? "selected" : ""}>${esc(v)}</option>`).join("")}`;
-    if (!$("#shCat").options.length) {
-      $("#shCat").innerHTML = opts("category", shareCat);
-      $("#shSec").innerHTML = opts("sector", shareSec);
-    }
+    const cols = SHARE_COLS.filter(([k]) => shareShow[k]);
+    const tpl = `minmax(92px, 1.5fr) ${cols.map((c) => c[2]).join(" ")}`;
+    const text = ["ticker", "category", "sector"].includes(key);
     const rows = shareRows
       .filter((r) => !shareQ || r.ticker.includes(shareQ))
       .filter((r) => !shareCat || r.category === shareCat)
       .filter((r) => !shareSec || r.sector === shareSec)
-      .sort((a, b) => (key === "ticker" ? (a.ticker < b.ticker ? -1 : 1) * dir : ((a[key] ?? -Infinity) - (b[key] ?? -Infinity)) * dir));
+      .filter((r) => shareChgMin === "" || r.changePct >= Number(shareChgMin))
+      .filter((r) => shareChgMax === "" || r.changePct <= Number(shareChgMax))
+      .filter((r) => shareVolMin === "" || (r.volume || 0) >= Number(shareVolMin))
+      .sort((a, b) => (text ? String(a[key] || "").localeCompare(String(b[key] || "")) * dir : ((a[key] ?? -Infinity) - (b[key] ?? -Infinity)) * dir));
     // advancers, decliners and unchanged among the shares listed, like the summary row at the top of BullBD's panel
     const adv = rows.filter((r) => r.changePct > 0).length, dec = rows.filter((r) => r.changePct < 0).length;
     $("#shNote").innerHTML = `<b class="up">▲ ${adv}</b> <b class="down">▼ ${dec}</b> <b>= ${rows.length - adv - dec}</b> <span>· ${rows.length} of ${shareRows.length} shares · last close ${esc(shareRows[0]?.date || "")}</span>`;
-    document.querySelectorAll(".sh-head button").forEach((b) => {
-      const on = b.dataset.k === key;
-      b.classList.toggle("on", on);
-      b.textContent = b.dataset.l + (on ? (dir > 0 ? " ↑" : " ↓") : "");
-    });
+    const head = $("#shHead");
+    head.style.gridTemplateColumns = tpl;
+    head.innerHTML = [["ticker", "Symbol"], ...cols.map((c) => [c[0], c[1]])]
+      .map(([k, l]) => `<button data-k="${k}" class="${k === key ? "on" : ""}">${l}${k === key ? (dir > 0 ? " ↑" : " ↓") : ""}</button>`)
+      .join("");
+    const cell = {
+      price: (r) => `<span class="px">${fmtPrice(r.price)}</span>`,
+      changePct: (r) => `<span class="chg ${r.changePct >= 0 ? "up" : "down"}">${fmtPct(r.changePct)}</span>`,
+      volume: (r) => `<span class="vol">${COMPACT.format(r.volume)}</span>`,
+      category: (r) => `<span class="sh-cat">${esc(r.category || "")}</span>`,
+      sector: (r) => `<span class="sh-sec">${esc(r.sector || "")}</span>`,
+    };
     box.innerHTML = rows
-      .map((r) => `<div class="wl-row sh-row ${r.symbol === cur ? "current" : ""}" data-sym="${esc(r.symbol)}" title="${esc([r.name, r.sector, r.category && `Category ${r.category}`].filter(Boolean).join(" · "))}"><span class="sh-name"><button class="star ${mine.has(r.symbol) ? "on" : ""}" title="${mine.has(r.symbol) ? "Remove from" : "Add to"} Favorites">${mine.has(r.symbol) ? "★" : "☆"}</button><span class="sym ${r.changePct >= 0 ? "up" : "down"}">${esc(r.ticker)}</span></span><span class="px">${fmtPrice(r.price)}</span><span class="chg ${r.changePct >= 0 ? "up" : "down"}">${fmtPct(r.changePct)}</span><span class="vol">${COMPACT.format(r.volume)}</span></div>`)
+      .map((r) => `<div class="wl-row sh-row ${r.symbol === cur ? "current" : ""}" data-sym="${esc(r.symbol)}" style="grid-template-columns:${tpl}" title="${esc([r.name, r.sector, r.category && `Category ${r.category}`].filter(Boolean).join(" · "))}"><span class="sh-name"><button class="star ${mine.has(r.symbol) ? "on" : ""}" title="${mine.has(r.symbol) ? "Remove from" : "Add to"} Favorites">${mine.has(r.symbol) ? "★" : "☆"}</button><span class="sym ${r.changePct >= 0 ? "up" : "down"}">${esc(r.ticker)}</span></span>${cols.map((c) => cell[c[0]](r)).join("")}</div>`)
       .join("") || '<div class="pad hint-text">No share matches.</div>';
   }
 

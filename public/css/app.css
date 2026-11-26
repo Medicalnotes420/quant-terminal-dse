@@ -1346,3 +1346,22 @@ button, select, input { font-family: inherit; }
 .tb:disabled { opacity: 0.4; pointer-events: none; }
 #tfMenu { max-width: 96px; }
 .rangebar .clock { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 2px; }
+
+/* tall tool flyouts scroll; the lower groups open upwards. All shares: Columns and Filters drawers */
+.dg-fly { max-height: calc(100vh - 70px); overflow-y: auto; }
+.dg:nth-of-type(n + 4) .dg-fly { top: auto; bottom: 0; }
+#sideBody { position: relative; }
+.sh-wrap { position: absolute; inset: 0; display: flex; min-height: 0; }
+.sh-main { flex: 1; min-width: 0; overflow-y: auto; }
+.sh-tabs { flex: none; width: 24px; display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-left: 1px solid var(--border); }
+.sh-tabs button { writing-mode: vertical-rl; transform: rotate(180deg); border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 10px 2px; font-size: 12px; font-weight: 500; border-radius: 6px; }
+.sh-tabs button:hover { background: var(--hover); color: var(--text); }
+.sh-tabs button.on { color: var(--accent); background: var(--accent-soft); }
+.sh-drawer { position: absolute; top: 0; bottom: 0; right: 24px; width: min(220px, 78%); z-index: 6; background: var(--bg); border-left: 1px solid var(--border); box-shadow: -8px 0 24px rgba(0, 0, 0, 0.25); padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.sh-drawer.hidden { display: none; }
+.sh-drawer h4 { margin: 0; font-size: 13px; }
+.sh-drawer label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.sh-drawer label.chk { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 13px; }
+.sh-drawer .sh-note { font-size: 11.5px; color: var(--muted); }
+.sh-drawer #shReset { margin-top: auto; }
+.sh-cat, .sh-sec { color: var(--muted); font-size: 12px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,6 +1,8 @@
 // Drawing tools, rendered as a Lightweight Charts series primitive. Points are stored as
 // { time (UTC seconds), price } so drawings stay put when you change timeframe.
 
+import { VolumeProfile } from "./volume-profile.js";
+
 export const TOOLS = [
   { id: "cursor", label: "Cursor", icon: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>' },
   {
@@ -123,6 +125,56 @@ export const TOOLS = [
   { id: "cyclic", label: "Cyclic lines", points: 2, icon: '<path d="M5 4v16M11 4v16M17 4v16"/>' },
   { id: "timecycles", label: "Time cycles", points: 2, icon: '<path d="M3 16a4 5 0 0 1 8 0M11 16a4 5 0 0 1 8 0"/>' },
   { id: "forecast", label: "Forecast", points: 2, icon: '<path d="M4 18l8-6 7-7M19 5h-6M19 5v6"/><circle cx="12" cy="12" r="1.5"/>' },
+  { id: "pitchfork", label: "Pitchfork", points: 3, icon: '<path d="M5 19L19 5M9 19l10-10M5 15L15 5"/>' },
+  { id: "schiff", label: "Schiff pitchfork", points: 3, icon: '<path d="M5 19L19 8M9 19l10-8M5 15l10-7"/>' },
+  { id: "mschiff", label: "Modified Schiff pitchfork", points: 3, icon: '<path d="M6 18L19 9M10 19l9-6M5 14l9-6"/>' },
+  { id: "pitchfan", label: "Pitchfan", points: 3, icon: '<path d="M5 19L19 5M5 19L19 10M5 19L19 15M5 19h14"/>' },
+  { id: "fibchannel", label: "Fib channel", points: 3, icon: '<path d="M4 19L18 11M4 15L18 7M4 11L18 3"/>' },
+  { id: "fibtimezone", label: "Fib time zone", points: 2, icon: '<path d="M5 4v16M8 4v16M12 4v16M19 4v16"/>' },
+  { id: "trendfibtime", label: "Trend-based fib time", points: 3, icon: '<path d="M4 18l5-9M12 4v16M16 4v16M20 4v16"/>' },
+  { id: "fibcircles", label: "Fib circles", points: 2, icon: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="9"/>' },
+  { id: "fibspiral", label: "Fib spiral", points: 2, icon: '<path d="M12 12a2 2 0 0 1 3 0 4 4 0 0 1-5 4 7 7 0 0 1-5-8 11 11 0 0 1 14 2"/>' },
+  { id: "fibarcs", label: "Fib speed resistance arcs", points: 2, icon: '<path d="M6 18a6 6 0 0 1 0-12M6 21a9 9 0 0 1 0-18M6 24a12 12 0 0 1 0-24"/>' },
+  { id: "fibwedge", label: "Fib wedge", points: 3, icon: '<path d="M5 19L19 6M5 19L19 14M9 14.5a6 6 0 0 1 8-3.5"/>' },
+  { id: "fibfan", label: "Fib speed resistance fan", points: 2, icon: '<path d="M5 19L19 5M5 19l14-9M5 19l14-5"/>' },
+  { id: "gannbox", label: "Gann box", points: 2, icon: '<rect x="4" y="4" width="16" height="16"/><path d="M4 4l16 16M4 20L20 4M12 4v16M4 12h16"/>' },
+  { id: "gannsquare", label: "Gann square", points: 2, icon: '<rect x="4" y="4" width="16" height="16"/><path d="M4 4l16 16M12 4v16M4 12h16"/>' },
+  { id: "gannfan", label: "Gann fan", points: 2, icon: '<path d="M5 19L19 5M5 19l14-4M5 19l14-9M5 19l9-14M5 19l4-14"/>' },
+  { id: "elliottimpulse", label: "Elliott impulse wave (12345)", points: 6, icon: '<path d="M3 19l4-6 3 3 5-10 2 5 4-4"/>' },
+  { id: "elliottcorrection", label: "Elliott correction wave (ABC)", points: 4, icon: '<path d="M4 6l6 10 3-5 7 9"/>' },
+  { id: "elliotttriangle", label: "Elliott triangle wave (ABCDE)", points: 6, icon: '<path d="M3 8l4 8 4-6 3 5 3-3 3 2"/>' },
+  { id: "elliottdouble", label: "Elliott double combo wave (WXY)", points: 4, icon: '<path d="M3 8l5 9 3-5 8 7"/>' },
+  { id: "elliotttriple", label: "Elliott triple combo wave (WXYXZ)", points: 6, icon: '<path d="M3 7l4 9 3-4 4 7 3-6 3 3"/>' },
+  { id: "cypher", label: "Cypher pattern", points: 5, icon: '<path d="M4 16l5-10 4 6 3-8 4 12"/>' },
+  { id: "trianglepattern", label: "Triangle pattern", points: 4, icon: '<path d="M4 8l5 10 5-7 6 4M4 8l16 9M9 18l11-7" />' },
+  { id: "threedrives", label: "Three drives pattern", points: 7, icon: '<path d="M3 19l3-9 2 5 3-9 2 5 3-8 3 8"/>' },
+  { id: "sine", label: "Sine line", points: 2, icon: '<path d="M3 12c3-9 6-9 9 0s6 9 9 0"/>' },
+  { id: "balloon", label: "Balloon", points: 2, icon: '<path d="M6 5h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-6l-4 5v-5H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/>' },
+  { id: "arrowleft", label: "Arrow mark left", points: 1, icon: '<path d="M20 12H5M11 6l-6 6 6 6"/>' },
+  { id: "arrowright", label: "Arrow mark right", points: 1, icon: '<path d="M4 12h15M13 6l6 6-6 6"/>' },
+  { id: "curve", label: "Curve", points: 3, icon: '<path d="M4 18Q12 2 20 18"/>' },
+  { id: "doublecurve", label: "Double curve", points: 2, icon: '<path d="M4 18C12 18 12 6 20 6"/>' },
+  { id: "arc", label: "Arc", points: 3, icon: '<path d="M4 18a9 9 0 0 1 16 0"/>' },
+  { id: "path", label: "Path (double-click to finish)", points: 50, icon: '<path d="M4 18l6-9 5 5 5-9M20 5h-5M20 5v5"/>' },
+  { id: "projection", label: "Projection", points: 3, icon: '<path d="M4 18l6-7M12 18l7-7M19 11h-5M19 11v5"/>' },
+  { id: "fixedvp", label: "Fixed range volume profile", points: 2, icon: '<path d="M5 5h8M5 9h12M5 13h6M5 17h10M5 4v14"/>' },
+  { id: "barspattern", label: "Bars pattern", points: 3, icon: '<path d="M4 18v-6M8 18V8M12 18v-4M16 14v-8M20 18v-7"/>' },
+  { id: "emoji_star", label: "Icon star", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">⭐</text>' },
+  { id: "emoji_thumbsup", label: "Icon thumbsup", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">👍</text>' },
+  { id: "emoji_thumbsdown", label: "Icon thumbsdown", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">👎</text>' },
+  { id: "emoji_warning", label: "Icon warning", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">⚠️</text>' },
+  { id: "emoji_check", label: "Icon check", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">✅</text>' },
+  { id: "emoji_cross", label: "Icon cross", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">❌</text>' },
+  { id: "emoji_fire", label: "Icon fire", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">🔥</text>' },
+  { id: "emoji_money", label: "Icon money", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">💰</text>' },
+  { id: "emoji_rocket", label: "Icon rocket", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">🚀</text>' },
+  { id: "emoji_chartup", label: "Icon chartup", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">📈</text>' },
+  { id: "emoji_chartdown", label: "Icon chartdown", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">📉</text>' },
+  { id: "emoji_bull", label: "Icon bull", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">🐂</text>' },
+  { id: "emoji_bear", label: "Icon bear", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">🐻</text>' },
+  { id: "emoji_eyes", label: "Icon eyes", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">👀</text>' },
+  { id: "emoji_bell", label: "Icon bell", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">🔔</text>' },
+  { id: "emoji_redflag", label: "Icon redflag", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">🚩</text>' },
   {
     id: "text",
     label: "Text note",
@@ -130,6 +182,34 @@ export const TOOLS = [
     icon: '<path d="M5 6h14M12 6v13"/>',
   },
 ];
+export const EMOJI_CHAR = {
+  emoji_star: "⭐",
+  emoji_thumbsup: "👍",
+  emoji_thumbsdown: "👎",
+  emoji_warning: "⚠️",
+  emoji_check: "✅",
+  emoji_cross: "❌",
+  emoji_fire: "🔥",
+  emoji_money: "💰",
+  emoji_rocket: "🚀",
+  emoji_chartup: "📈",
+  emoji_chartdown: "📉",
+  emoji_bull: "🐂",
+  emoji_bear: "🐻",
+  emoji_eyes: "👀",
+  emoji_bell: "🔔",
+  emoji_redflag: "🚩",
+};
+const WAVES = {
+  elliottimpulse: ["0", "1", "2", "3", "4", "5"],
+  elliottcorrection: ["0", "A", "B", "C"],
+  elliotttriangle: ["0", "A", "B", "C", "D", "E"],
+  elliottdouble: ["0", "W", "X", "Y"],
+  elliotttriple: ["0", "W", "X", "Y", "X", "Z"],
+  cypher: ["X", "A", "B", "C", "D"],
+  threedrives: ["0", "1", "2", "3", "4", "5", "6"],
+};
+const FIB = [0.382, 0.5, 0.618, 1, 1.382, 1.618];
 export const TOOL_BY_ID = Object.fromEntries(TOOLS.map((t) => [t.id, t]));
 export const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618];
 
@@ -414,6 +494,376 @@ export class DrawingLayer {
         ctx.fill();
         label(`${dp >= 0 ? "+" : ""}${price(dp)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%) · ${bars} bars`, b.x + 8, b.y, "left", up ? "#089981" : "#f23645");
         ctx.fillStyle = color;
+        break;
+      }
+      case "pitchfork":
+      case "schiff":
+      case "mschiff": {
+        if (!c) {
+          line(a.x, a.y, b.x, b.y);
+          break;
+        }
+        const S = d.type === "pitchfork" ? a : d.type === "schiff" ? { x: a.x, y: (a.y + b.y) / 2 } : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const mid = { x: (b.x + c.x) / 2, y: (b.y + c.y) / 2 };
+        const dx = mid.x - S.x,
+          dy = mid.y - S.y,
+          len = Math.hypot(dx, dy) || 1;
+        const ray = (p) => line(p.x, p.y, p.x + (dx / len) * 1e5, p.y + (dy / len) * 1e5);
+        line(b.x, b.y, c.x, c.y);
+        ray(S);
+        ray(b);
+        ray(c);
+        ctx.globalAlpha = 0.07;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x + (dx / len) * 3000, b.y + (dy / len) * 3000);
+        ctx.lineTo(c.x + (dx / len) * 3000, c.y + (dy / len) * 3000);
+        ctx.lineTo(c.x, c.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "pitchfan": {
+        if (!c) {
+          line(a.x, a.y, b.x, b.y);
+          break;
+        }
+        line(b.x, b.y, c.x, c.y);
+        for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+          const p = { x: b.x + (c.x - b.x) * t, y: b.y + (c.y - b.y) * t };
+          const [, e] = extend(a, p, false);
+          line(a.x, a.y, e.x, e.y);
+        }
+        break;
+      }
+      case "fibchannel": {
+        line(a.x, a.y, b.x, b.y);
+        if (!c) break;
+        const ux = b.x - a.x,
+          uy = b.y - a.y,
+          len = Math.hypot(ux, uy) || 1;
+        const nx = -uy / len,
+          ny = ux / len,
+          off = (c.x - a.x) * nx + (c.y - a.y) * ny;
+        for (const r of [0.382, 0.5, 0.618, 1, 1.618]) {
+          line(a.x + nx * off * r, a.y + ny * off * r, b.x + nx * off * r, b.y + ny * off * r);
+          label(String(r), b.x + nx * off * r + 4, b.y + ny * off * r, "left");
+        }
+        break;
+      }
+      case "fibtimezone":
+      case "trendfibtime": {
+        const tz = d.type === "fibtimezone";
+        const base = b.x - a.x;
+        if (Math.abs(base) < 2) break;
+        const from = tz ? a : c || b;
+        const steps = tz ? [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89] : [0, 0.382, 0.5, 0.618, 1, 1.382, 1.618, 2, 2.618];
+        if (!tz) {
+          ctx.setLineDash([4, 4]);
+          line(a.x, a.y, b.x, b.y);
+          if (c) line(b.x, b.y, c.x, c.y);
+          ctx.setLineDash([]);
+        }
+        for (const n of steps) {
+          const x = from.x + n * base;
+          if (x < -10 || x > size.width + 10) continue;
+          line(x, 0, x, size.height);
+          label(String(n), x + 3, 12, "left");
+        }
+        break;
+      }
+      case "fibcircles": {
+        const cx = (a.x + b.x) / 2,
+          cy = (a.y + b.y) / 2,
+          R = Math.hypot(b.x - a.x, b.y - a.y) / 2;
+        ctx.setLineDash([4, 4]);
+        line(a.x, a.y, b.x, b.y);
+        ctx.setLineDash([]);
+        for (const r of [0.382, 0.5, 0.618, 1, 1.382, 1.618, 2]) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, Math.max(R * r, 1), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        break;
+      }
+      case "fibspiral": {
+        const R0 = Math.hypot(b.x - a.x, b.y - a.y),
+          th0 = Math.atan2(b.y - a.y, b.x - a.x),
+          k = Math.log(1.618) / (Math.PI / 2);
+        ctx.beginPath();
+        for (let t = -8 * Math.PI; t <= 0; t += 0.08) {
+          const r = R0 * Math.exp(k * t),
+            px = a.x + r * Math.cos(th0 + t),
+            py = a.y + r * Math.sin(th0 + t);
+          t === -8 * Math.PI ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        break;
+      }
+      case "fibarcs": {
+        const D = Math.hypot(b.x - a.x, b.y - a.y),
+          t0 = Math.atan2(a.y - b.y, a.x - b.x) + Math.PI;
+        ctx.setLineDash([4, 4]);
+        line(a.x, a.y, b.x, b.y);
+        ctx.setLineDash([]);
+        for (const r of FIB) {
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, Math.max(D * r, 1), t0 - Math.PI / 2, t0 + Math.PI / 2);
+          ctx.stroke();
+        }
+        break;
+      }
+      case "fibwedge": {
+        if (!c) {
+          line(a.x, a.y, b.x, b.y);
+          break;
+        }
+        const t1 = Math.atan2(b.y - a.y, b.x - a.x),
+          t2 = Math.atan2(c.y - a.y, c.x - a.x);
+        let diff = t2 - t1;
+        while (diff > Math.PI) diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        const R = Math.hypot(b.x - a.x, b.y - a.y);
+        ctx.setLineDash([4, 4]);
+        line(a.x, a.y, b.x, b.y);
+        line(a.x, a.y, c.x, c.y);
+        ctx.setLineDash([]);
+        for (const r of FIB) {
+          ctx.beginPath();
+          ctx.arc(a.x, a.y, Math.max(R * r, 1), t1, t1 + diff, diff < 0);
+          ctx.stroke();
+        }
+        break;
+      }
+      case "fibfan": {
+        line(a.x, a.y, b.x, b.y);
+        for (const r of [0.382, 0.5, 0.618]) {
+          for (const p of [{ x: b.x, y: a.y + (b.y - a.y) * r }, { x: a.x + (b.x - a.x) * r, y: b.y }]) {
+            const [, e] = extend(a, p, false);
+            line(a.x, a.y, e.x, e.y);
+          }
+          label(String(r), b.x + 4, a.y + (b.y - a.y) * r, "left");
+        }
+        break;
+      }
+      case "gannbox":
+      case "gannsquare": {
+        let x2 = b.x,
+          y2 = b.y;
+        if (d.type === "gannsquare") {
+          const side = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+          x2 = a.x + Math.sign(b.x - a.x || 1) * side;
+          y2 = a.y + Math.sign(b.y - a.y || 1) * side;
+        }
+        ctx.globalAlpha = 0.06;
+        ctx.fillRect(a.x, a.y, x2 - a.x, y2 - a.y);
+        ctx.globalAlpha = 1;
+        ctx.strokeRect(a.x, a.y, x2 - a.x, y2 - a.y);
+        line(a.x, a.y, x2, y2);
+        if (d.type === "gannbox") line(a.x, y2, x2, a.y);
+        ctx.setLineDash([3, 4]);
+        for (const f of [0.25, 0.5, 0.75]) {
+          line(a.x + (x2 - a.x) * f, a.y, a.x + (x2 - a.x) * f, y2);
+          line(a.x, a.y + (y2 - a.y) * f, x2, a.y + (y2 - a.y) * f);
+        }
+        ctx.setLineDash([]);
+        break;
+      }
+      case "gannfan": {
+        const dx = b.x - a.x,
+          dy = b.y - a.y;
+        if (Math.abs(dx) < 1) break;
+        [["1x8", 1 / 8], ["1x4", 1 / 4], ["1x3", 1 / 3], ["1x2", 1 / 2], ["1x1", 1], ["2x1", 2], ["3x1", 3], ["4x1", 4], ["8x1", 8]].forEach(([t, f]) => {
+          const [, e] = extend(a, { x: a.x + dx, y: a.y + dy * f }, false);
+          line(a.x, a.y, e.x, e.y);
+          label(t, Math.min(a.x + dx, size.width - 20), a.y + dy * f, "left");
+        });
+        break;
+      }
+      case "trianglepattern": {
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.stroke();
+        if (pts[2]) line(a.x, a.y, pts[2].x, pts[2].y);
+        if (pts[3]) line(b.x, b.y, pts[3].x, pts[3].y);
+        pts.forEach((p, i) => label("ABCD"[i], p.x, p.y - 10, "center", color));
+        break;
+      }
+      case "sine": {
+        const dx = b.x - a.x,
+          dy = b.y - a.y;
+        if (Math.abs(dx) < 2) break;
+        ctx.beginPath();
+        for (let x = 0; x <= size.width; x += 3) {
+          const y = a.y + dy * Math.sin(((x - a.x) / dx) * (Math.PI / 2));
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        break;
+      }
+      case "balloon": {
+        const txt = d.text || "Balloon";
+        const w = ctx.measureText(txt).width + 16;
+        ctx.beginPath();
+        ctx.roundRect(b.x, b.y - 13, w, 26, 8);
+        ctx.fill();
+        line(a.x, a.y, b.x, b.y);
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(txt, b.x + 8, b.y);
+        ctx.fillStyle = color;
+        break;
+      }
+      case "arrowleft":
+      case "arrowright": {
+        const sgn = d.type === "arrowright" ? -1 : 1;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(a.x - 13 * sgn, a.y - 9);
+        ctx.lineTo(a.x - 13 * sgn, a.y - 3.5);
+        ctx.lineTo(a.x - 28 * sgn, a.y - 3.5);
+        ctx.lineTo(a.x - 28 * sgn, a.y + 3.5);
+        ctx.lineTo(a.x - 13 * sgn, a.y + 3.5);
+        ctx.lineTo(a.x - 13 * sgn, a.y + 9);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case "curve":
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        if (c) ctx.quadraticCurveTo(b.x, b.y, c.x, c.y);
+        else ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+        break;
+      case "doublecurve":
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.bezierCurveTo((a.x + b.x) / 2, a.y, (a.x + b.x) / 2, b.y, b.x, b.y);
+        ctx.stroke();
+        break;
+      case "arc": {
+        if (!c) {
+          line(a.x, a.y, b.x, b.y);
+          break;
+        }
+        const dd = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+        if (Math.abs(dd) < 1e-6) {
+          line(a.x, a.y, c.x, c.y);
+          break;
+        }
+        const sa = a.x * a.x + a.y * a.y,
+          sb = b.x * b.x + b.y * b.y,
+          sc = c.x * c.x + c.y * c.y;
+        const ux = (sa * (b.y - c.y) + sb * (c.y - a.y) + sc * (a.y - b.y)) / dd,
+          uy = (sa * (c.x - b.x) + sb * (a.x - c.x) + sc * (b.x - a.x)) / dd;
+        const R = Math.hypot(a.x - ux, a.y - uy),
+          ta = Math.atan2(a.y - uy, a.x - ux),
+          tb = Math.atan2(b.y - uy, b.x - ux),
+          tc = Math.atan2(c.y - uy, c.x - ux);
+        const norm = (t) => ((t % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        ctx.beginPath();
+        ctx.arc(ux, uy, R, ta, tc, !(norm(tb - ta) < norm(tc - ta)));
+        ctx.stroke();
+        break;
+      }
+      case "path": {
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.stroke();
+        if (pts.length > 1) {
+          const e = pts[pts.length - 1],
+            f = pts[pts.length - 2],
+            ang = Math.atan2(e.y - f.y, e.x - f.x);
+          ctx.beginPath();
+          ctx.moveTo(e.x, e.y);
+          ctx.lineTo(e.x - 11 * Math.cos(ang - 0.4), e.y - 11 * Math.sin(ang - 0.4));
+          ctx.lineTo(e.x - 11 * Math.cos(ang + 0.4), e.y - 11 * Math.sin(ang + 0.4));
+          ctx.closePath();
+          ctx.fill();
+        }
+        break;
+      }
+      case "projection": {
+        line(a.x, a.y, b.x, b.y);
+        if (!c) break;
+        const ex = c.x + (b.x - a.x),
+          ey = c.y + (b.y - a.y);
+        ctx.setLineDash([6, 4]);
+        line(c.x, c.y, ex, ey);
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(ex, ey, 4, 0, Math.PI * 2);
+        ctx.fill();
+        const dp = b.price - a.price;
+        label(`${dp >= 0 ? "+" : ""}${price(dp)}`, ex + 8, ey, "left", color);
+        break;
+      }
+      case "fixedvp": {
+        const t1 = Math.min(a.time, b.time),
+          t2 = Math.max(a.time, b.time);
+        const inRange = this.pane.shown.filter((bar) => bar.time >= t1 && bar.time <= t2);
+        const prof = inRange.length > 1 ? VolumeProfile.profile(inRange, 24, 70) : null;
+        const x0 = Math.min(a.x, b.x),
+          maxW = Math.max(40, Math.abs(b.x - a.x) * 0.8);
+        ctx.setLineDash([3, 3]);
+        line(x0, 0, x0, size.height);
+        line(Math.max(a.x, b.x), 0, Math.max(a.x, b.x), size.height);
+        ctx.setLineDash([]);
+        if (!prof) break;
+        prof.total.forEach((v, i) => {
+          const y1 = this.y(prof.lo + prof.step * (i + 1)),
+            y2 = this.y(prof.lo + prof.step * i);
+          if (y1 == null || y2 == null) return;
+          ctx.globalAlpha = i >= prof.vaLow && i <= prof.vaHigh ? 0.45 : 0.22;
+          ctx.fillRect(x0, y1 + 0.5, (v / prof.max) * maxW, Math.max(1, y2 - y1 - 1));
+        });
+        ctx.globalAlpha = 1;
+        const yp = this.y(prof.lo + prof.step * (prof.poc + 0.5));
+        if (yp != null) line(x0, yp, x0 + maxW, yp);
+        break;
+      }
+      case "barspattern": {
+        const t1 = Math.min(a.time, b.time),
+          t2 = Math.max(a.time, b.time);
+        const inRange = this.pane.shown.filter((bar) => bar.time >= t1 && bar.time <= t2);
+        if (inRange.length < 2 || !c) {
+          line(a.x, a.y, b.x, b.y);
+          break;
+        }
+        const x0 = this.x(inRange[0].time),
+          p0 = inRange[0].close;
+        ctx.beginPath();
+        inRange.forEach((bar, i) => {
+          const px = c.x + (this.x(bar.time) - x0),
+            py = this.y(c.price + (bar.close - p0));
+          i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        });
+        ctx.stroke();
+        break;
+      }
+      case "elliottimpulse":
+      case "elliottcorrection":
+      case "elliotttriangle":
+      case "elliottdouble":
+      case "elliotttriple":
+      case "cypher":
+      case "threedrives": {
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.stroke();
+        if (d.type === "cypher" && pts[3]) {
+          ctx.setLineDash([4, 4]);
+          line(pts[0].x, pts[0].y, pts[3].x, pts[3].y);
+          if (pts[4]) line(pts[1].x, pts[1].y, pts[4].x, pts[4].y);
+          ctx.setLineDash([]);
+        }
+        pts.forEach((p, i) => {
+          const up = (!pts[i - 1] || p.y < pts[i - 1].y) && (!pts[i + 1] || p.y < pts[i + 1].y);
+          label(WAVES[d.type][i] || "", p.x, p.y + (up ? -12 : 12), "center", color);
+        });
         break;
       }
       case "arrow": {
@@ -724,6 +1174,14 @@ export class DrawingLayer {
         break;
       }
       default:
+        if (EMOJI_CHAR[d.type]) {
+          ctx.save();
+          ctx.font = "24px \"Segoe UI Emoji\", \"Apple Color Emoji\", sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(EMOJI_CHAR[d.type], a.x, a.y);
+          ctx.restore();
+        }
         break;
     }
     if (active && d.type !== "brush" && d.type !== "highlighter") {
@@ -765,7 +1223,7 @@ export class DrawingLayer {
       else if (d.type === "hray")
         dist = x >= a.x - 4 ? Math.abs(y - a.y) : Infinity;
       else if (d.type === "vline") dist = Math.abs(x - a.x);
-      else if (["brush", "highlighter", "xabcd", "abcd", "polyline", "headshoulders"].includes(d.type))
+      else if (["brush", "highlighter", "xabcd", "abcd", "polyline", "headshoulders", "path", ...Object.keys(WAVES)].includes(d.type))
         dist = Math.min(Infinity, ...pts.slice(1).map((q, i) => segDist(pts[i], q)));
       else if (d.type === "cyclic" || d.type === "timecycles") {
         const w = Math.abs(b.x - a.x) || 1;
@@ -782,6 +1240,8 @@ export class DrawingLayer {
           cy = circ ? a.y : (a.y + b.y) / 2;
         dist = Math.abs(Math.hypot((x - cx) / rx, (y - cy) / ry) - 1) * Math.min(rx, ry);
       } else if (d.type === "triangle") dist = Math.min(Infinity, ...pts.map((q, i) => segDist(q, pts[(i + 1) % pts.length])));
+      else if (EMOJI_CHAR[d.type]) dist = Math.abs(x - a.x) < 14 && Math.abs(y - a.y) < 14 ? 0 : Infinity;
+      else if (d.type === "arrowleft" || d.type === "arrowright") dist = Math.abs(y - a.y) < 10 && Math.abs(x - a.x) < 30 ? 0 : Infinity;
       else if (["arrowup", "arrowdown", "flag"].includes(d.type))
         dist = Math.abs(x - a.x) < 12 && y >= a.y - 30 && y <= a.y + 30 ? 0 : Infinity;
       else if (d.type === "daterange") dist = x >= Math.min(a.x, b.x) - 4 && x <= Math.max(a.x, b.x) + 4 ? 3 : Infinity;
@@ -791,12 +1251,14 @@ export class DrawingLayer {
           x >= a.x - 4 && x <= a.x + 120 && Math.abs(y - a.y) < 12
             ? 0
             : Infinity;
-      else if (["rect", "fib", "fibext", "measure", "long", "short", "daterangeprice", "flat", "rotated"].includes(d.type)) {
+      else if (["rect", "fib", "fibext", "measure", "long", "short", "daterangeprice", "flat", "rotated", "pitchfork", "schiff", "mschiff", "pitchfan", "fibchannel", "fibtimezone", "trendfibtime", "fibcircles", "fibspiral", "fibarcs", "fibwedge", "fibfan", "gannbox", "gannsquare", "gannfan", "trianglepattern", "sine", "balloon", "curve", "doublecurve", "arc", "projection", "fixedvp", "barspattern"].includes(d.type)) {
+        const xs = pts.map((p) => p.x),
+          ys = pts.map((p) => p.y);
         const inside =
-          x >= Math.min(a.x, b.x) - 4 &&
-          x <= Math.max(a.x, b.x, a.x + 40) + 4 &&
-          y >= Math.min(a.y, b.y) - 40 &&
-          y <= Math.max(a.y, b.y) + 40;
+          x >= Math.min(...xs) - 4 &&
+          x <= Math.max(...xs, a.x + 40) + 4 &&
+          y >= Math.min(...ys) - 40 &&
+          y <= Math.max(...ys) + 40;
         dist = inside ? 3 : Infinity;
       } else if (b) {
         const far = (p, q, both) => {
