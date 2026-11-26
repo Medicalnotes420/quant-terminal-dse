@@ -28,6 +28,13 @@ const CHART_DEFAULTS = {
   marginTop: 20, marginBottom: 10, rightMargin: 8,
   bgType: "solid", bgColor: "", bgColor2: "", gridColor: "", crosshairColor: "", textColor: "", scaleLineColor: "",
 };
+// The top bar items you can show, hide and reorder (the symbol box, Back and the right-hand buttons stay put).
+const TOPBAR_ITEMS = [
+  ["tfButtons", "Timeframe buttons"], ["tfCustom", "Custom interval box"], ["tfMenu", "Intervals menu"], ["chartType", "Chart type"],
+  ["compareBtn", "Compare"], ["indicatorsBtn", "Indicators"], ["tplBtn", "Templates"], ["tbUndo", "Undo"], ["tbRedo", "Redo"],
+  ["zoomOutBtn", "Zoom out"], ["zoomInBtn", "Zoom in"], ["layoutSel", "Chart layouts"], ["syncSymbol", "Sync symbol"],
+  ["replayBtn", "Replay"], ["patBtn", "Patterns"], ["adjBtn", "Adjusted"], ["marksBtn", "Marks"], ["saveBtn", "Save"], ["alertBtn", "Alert"],
+];
 const DEFAULT_WATCHLISTS = {
   Main: [
     "DSE:DSEX",
@@ -111,6 +118,8 @@ class App {
     this.settings.chart = { ...CHART_DEFAULTS, ...this.settings.chart };
     this.state.settings = this.settings;
     this.applyChartClasses();
+    this.cursorTool = { cross: "cursor", dot: "dot", arrow: "arrowcursor" }[this.settings.cursorStyle] || "cursor";
+    this.applyCursorClass();
     for (const p of this.state.panes) if (!isDse(p.symbol)) p.symbol = "DSE:DSEX";
     // ?symbol=DSE:AL-HAJTEX opens that share on the first chart
     const want = new URLSearchParams(location.search).get("symbol");
@@ -127,6 +136,7 @@ class App {
     this.buildRangeBar();
     this.setLayout(this.state.layout, false);
     this.bindSidePanel();
+    this.bindBottomResizer();
     this.panels = initPanels(this);
     this.bindKeys();
     this.listenAlerts();
@@ -159,13 +169,15 @@ class App {
       h.redo = [];
     }
     this.state.drawings[symbol] = items.map(
-      ({ id, type, points, text, color, rr }) => ({
+      ({ id, type, points, text, color, rr, fx, fy }) => ({
         id,
         type,
         points,
         text,
         color,
         rr,
+        fx,
+        fy,
       }),
     );
     for (const p of this.panes)
@@ -262,6 +274,38 @@ class App {
   }
 
   // ---------- the side panel (Favorites, All shares, Details, Alerts): drag its edge to resize, minimize to a tab ----------
+  // Drag the top edge of the bottom panel to change its height; double-click puts it back to 320px.
+  bindBottomResizer() {
+    const bottom = $("#bottom"),
+      bar = $("#bottomResizer");
+    const set = (h, save = true) => {
+      const max = Math.max(160, Math.round(innerHeight * 0.8));
+      if (h == null) bottom.style.removeProperty("--bottom-h");
+      else bottom.style.setProperty("--bottom-h", `${Math.max(120, Math.min(max, Math.round(h)))}px`);
+      if (save) {
+        this.state.bottomHeight = h == null ? null : Math.max(120, Math.min(max, Math.round(h)));
+        this.persist();
+      }
+    };
+    if (this.state.bottomHeight) set(this.state.bottomHeight, false);
+    bar.onpointerdown = (e) => {
+      if (bottom.classList.contains("collapsed")) $("#bottomToggle").click(); // opens it the usual way, so its tab draws
+      e.preventDefault();
+      bar.setPointerCapture(e.pointerId);
+      bar.classList.add("dragging");
+      const startY = e.clientY,
+        startH = bottom.getBoundingClientRect().height;
+      bar.onpointermove = (m) => set(startH + (startY - m.clientY), false);
+    };
+    bar.onpointerup = (e) => {
+      bar.releasePointerCapture(e.pointerId);
+      bar.onpointermove = null;
+      bar.classList.remove("dragging");
+      set(bottom.getBoundingClientRect().height);
+    };
+    bar.ondblclick = () => set(null);
+  }
+
   applySide() {
     const w = Math.max(SIDE_MIN, Math.min(SIDE_MAX, Number(this.state.sideWidth) || 300));
     this.state.sideWidth = w;
@@ -569,6 +613,36 @@ class App {
     };
     $("#settingsBtn").onclick = () => this.openSettings();
     $("#backBtn").onclick = () => this.goBack();
+    $("#tbCustomBtn").onclick = () => this.openTopbarCustomize();
+    $(".topbar").oncontextmenu = (e) => {
+      if (e.target.closest("input, select")) return;
+      e.preventDefault();
+      this.openTopbarCustomize();
+    };
+    $("#tbMoreBtn").onclick = (e) => {
+      e.stopPropagation();
+      const more = $("#tbMore"),
+        r = e.currentTarget.getBoundingClientRect();
+      more.style.left = `${Math.max(8, Math.min(r.left, innerWidth - 230))}px`;
+      more.style.top = `${r.bottom + 4}px`;
+      more.classList.toggle("hidden");
+    };
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#tbMore, #tbMoreBtn") || e.target.closest("#tbMore button")) $("#tbMore").classList.add("hidden");
+    });
+    let topbarTimer = 0,
+      topbarLate = 0;
+    const relayout = () => {
+      cancelAnimationFrame(topbarTimer);
+      topbarTimer = requestAnimationFrame(() => this.layoutTopbar());
+      // measure again once the window has settled after a resize
+      clearTimeout(topbarLate);
+      topbarLate = setTimeout(() => this.layoutTopbar(), 250);
+    };
+    new ResizeObserver(relayout).observe($(".topbar"));
+    window.addEventListener("resize", relayout);
+    this.relayoutTopbar = relayout;
+    relayout();
     const menu = $("#tfMenu");
     menu.onchange = () => {
       if (menu.value) this.setTf(menu.value);
@@ -581,6 +655,7 @@ class App {
     if (!p) return;
     $("#symbolLabel").textContent = ticker(p.cfg.symbol);
     $("#backBtn").disabled = !this.symBack?.length;
+    this.relayoutTopbar?.();
     $("#themeLabel").textContent = this.settings.theme === "dark" ? "Dark" : "Light";
     this.syncFavorite();
     $("#symbolBtn").title =
@@ -597,6 +672,122 @@ class App {
     $("#marksBtn").classList.toggle("on", p.cfg.marks !== false);
     $("#adjBtn").classList.toggle("on", !!p.cfg.adjusted);
     $("#replayBtn").classList.toggle("on", !!p.replay);
+  }
+
+  // When the window is too narrow for the whole top bar, the least-used controls move into a "more" menu (the
+  // real elements move, so they keep working) and come back when there is room. Patterns, Marks and the
+  // other chart switches go last.
+  layoutTopbar() {
+    const bar = $(".topbar"),
+      more = $("#tbMore"),
+      btn = $("#tbMoreBtn");
+    if (!bar || !btn) return;
+    const byId = (id) => document.getElementById(id);
+    const order = [
+      byId("alertBtn"), byId("saveBtn"), byId("tplBtn"), byId("zoomOutBtn"), byId("zoomInBtn"), byId("tfMenu"), byId("tfCustom"),
+      byId("layoutSel"), byId("syncSymbol")?.closest("label"), byId("adjBtn"), byId("replayBtn"), byId("tbRedo"), byId("tbUndo"),
+      byId("marksBtn"), byId("patBtn"), byId("compareBtn"),
+    ].filter(Boolean);
+    for (const el of order) {
+      if (el._ph) {
+        el._ph.replaceWith(el);
+        el._ph = null;
+      }
+    }
+    this.applyTopbarCustom();
+    btn.hidden = true;
+    more.classList.add("hidden");
+    for (const el of order) {
+      if (el.classList.contains("tb-off")) continue;
+      if (bar.scrollWidth <= bar.clientWidth + 1) break;
+      btn.hidden = false;
+      el._ph = document.createComment("tb");
+      el.replaceWith(el._ph);
+      more.appendChild(el);
+    }
+    // a moved control sits above its neighbours in the menu in the order it was moved
+    if (!more.children.length) btn.hidden = true;
+  }
+
+  // ---------- customize the top bar: show or hide items, and put them in your own order ----------
+  topbarEl(id) {
+    const e = document.getElementById(id);
+    return id === "syncSymbol" ? e?.closest("label") : e;
+  }
+  applyTopbarCustom() {
+    const bar = $(".topbar"),
+      c = this.settings.topbar || {};
+    const items = TOPBAR_ITEMS.map(([id]) => ({ id, el: this.topbarEl(id) })).filter((x) => x.el && x.el.parentElement === bar);
+    for (const x of items) x.el.classList.toggle("tb-off", !!c.hidden?.includes(x.id));
+    // items fill the slots the default layout gives them, in the saved order
+    const slots = [...items].sort((p, q) => (p.el.compareDocumentPosition(q.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+    const rank = (id) => (c.order?.includes(id) ? c.order.indexOf(id) : 1000 + TOPBAR_ITEMS.findIndex(([k]) => k === id));
+    const want = [...items].sort((p, q) => rank(p.id) - rank(q.id));
+    if (want.every((x, i) => x.el === slots[i].el)) return;
+    const holes = slots.map((s) => {
+      const ph = document.createComment("slot");
+      s.el.replaceWith(ph);
+      return ph;
+    });
+    holes.forEach((ph, i) => ph.replaceWith(want[i].el));
+  }
+  openTopbarCustomize() {
+    const c = (this.settings.topbar ||= {});
+    let order = TOPBAR_ITEMS.map(([id]) => id).sort((p, q) => {
+      const r = (id) => (c.order?.includes(id) ? c.order.indexOf(id) : 1000 + TOPBAR_ITEMS.findIndex(([k]) => k === id));
+      return r(p) - r(q);
+    });
+    const label = Object.fromEntries(TOPBAR_ITEMS);
+    const card = this.modal(
+      "Customize the top bar",
+      '<p class="hint-text">Tick to show an item, drag the handle or use the arrows to move it. The symbol box, Back and the buttons on the right stay where they are.</p><ul class="tbc-list" id="tbcList"></ul>',
+      { foot: '<button class="btn" data-reset style="margin-right:auto">Reset</button><button class="btn primary" data-done>Done</button>' },
+    );
+    const commit = () => {
+      c.order = order;
+      c.hidden = [...card.querySelectorAll("#tbcList input:not(:checked)")].map((i) => i.closest("li").dataset.id);
+      this.persist();
+      this.layoutTopbar();
+    };
+    const draw = () => {
+      const hidden = new Set(c.hidden || []);
+      card.querySelector("#tbcList").innerHTML = order
+        .map((id) => `<li draggable="true" data-id="${id}"><span class="grip" title="Drag to move">&#8942;&#8942;</span><label><input type="checkbox" ${hidden.has(id) ? "" : "checked"}> ${esc(label[id])}</label><button class="btn small" data-mv="-1" title="Move up">&#9650;</button><button class="btn small" data-mv="1" title="Move down">&#9660;</button></li>`)
+        .join("");
+    };
+    draw();
+    const list = card.querySelector("#tbcList");
+    list.onchange = commit;
+    list.onclick = (e) => {
+      const mv = e.target.closest("[data-mv]")?.dataset.mv;
+      if (!mv) return;
+      const id = e.target.closest("li").dataset.id,
+        i = order.indexOf(id),
+        j = i + Number(mv);
+      if (j < 0 || j >= order.length) return;
+      [order[i], order[j]] = [order[j], order[i]];
+      commit();
+      draw();
+    };
+    let dragId = null;
+    list.ondragstart = (e) => (dragId = e.target.closest("li")?.dataset.id);
+    list.ondragover = (e) => e.preventDefault();
+    list.ondrop = (e) => {
+      e.preventDefault();
+      const to = e.target.closest("li")?.dataset.id;
+      if (!dragId || !to || to === dragId) return;
+      order.splice(order.indexOf(dragId), 1);
+      order.splice(order.indexOf(to), 0, dragId);
+      commit();
+      draw();
+    };
+    card.querySelector("[data-done]").onclick = () => this.closeModal();
+    card.querySelector("[data-reset]").onclick = () => {
+      delete this.settings.topbar;
+      this.persist();
+      this.layoutTopbar();
+      this.closeModal();
+    };
   }
 
   goBack() {
@@ -771,12 +962,12 @@ class App {
         : `<div class="dg">${item(T[ids[0]])}<div class="dg-fly">${ids.map((id) => item(T[id], `<span>${T[id].label}</span>`)).join("")}</div></div>`;
     // BullBD's groups, in its order: cursors, lines, Fibonacci, shapes, annotation, patterns, prediction and measurement
     bar.innerHTML =
-      [["cursor", "eraser"]].map(group).join("") + "<hr>" +
+      [["cursor", "dot", "arrowcursor", "eraser"]].map(group).join("") + "<hr>" +
       [
-        ["trend", "arrow", "info", "angle", "ray", "extended", "hline", "hray", "vline", "crossline", "regression", "flat", "channel"],
-        ["fib", "fibext", "fibchannel", "fibtimezone", "trendfibtime", "fibcircles", "fibspiral", "fibarcs", "fibwedge", "fibfan", "gannbox", "gannsquare", "gannfan", "pitchfork", "schiff", "mschiff", "pitchfan"],
+        ["trend", "arrow", "info", "angle", "ray", "extended", "hline", "hray", "vline", "crossline", "regression", "flat", "channel", "disjoint"],
+        ["fib", "fibext", "fibchannel", "fibtimezone", "trendfibtime", "fibcircles", "fibspiral", "fibarcs", "fibwedge", "fibfan", "gannbox", "gannsquare", "gannsquarefixed", "gannfan", "pitchfork", "insidepitchfork", "schiff", "mschiff", "pitchfan"],
         ["brush", "highlighter", "rect", "rotated", "circle", "ellipse", "triangle", "polyline", "path", "curve", "doublecurve", "arc"],
-        ["text", "note", "callout", "signpost", "balloon", "pricelabel", "pricenote", "arrowup", "arrowdown", "arrowleft", "arrowright", "flag"],
+        ["text", "note", "anchoredtext", "anchorednote", "callout", "signpost", "balloon", "arrowmarker", "pricelabel", "pricenote", "arrowup", "arrowdown", "arrowleft", "arrowright", "flag"],
         ["xabcd", "cypher", "abcd", "trianglepattern", "threedrives", "headshoulders", "elliottimpulse", "elliotttriangle", "elliotttriple", "elliottcorrection", "elliottdouble", "cyclic", "timecycles", "sine"],
         ["long", "short", "forecast", "projection", "barspattern", "fixedvp", "daterange", "pricerange", "daterangeprice", "measure"],
         ["emoji_star", "emoji_thumbsup", "emoji_thumbsdown", "emoji_warning", "emoji_check", "emoji_cross", "emoji_fire", "emoji_money", "emoji_rocket", "emoji_chartup", "emoji_chartdown", "emoji_bull", "emoji_bear", "emoji_eyes", "emoji_bell", "emoji_redflag"],
@@ -807,7 +998,10 @@ class App {
         g.classList.add("shut");
         g.onmouseleave = () => g.classList.remove("shut");
       }
-      if (b.dataset.tool)
+      if (["cursor", "dot", "arrowcursor"].includes(b.dataset.tool)) {
+        this.setCursorStyle(b.dataset.tool);
+        this.setTool("cursor");
+      } else if (b.dataset.tool)
         this.setTool(this.tool === b.dataset.tool ? "cursor" : b.dataset.tool);
       const flag = { magnet: "magnet", lock: "lockDrawings", hide: "hideDrawings" }[b.dataset.act];
       if (flag) {
@@ -838,16 +1032,32 @@ class App {
     this.setTool("cursor");
   }
 
+  // Cursor styles: Cross (the crosshair), Dot and Arrow. The last two hide the crosshair lines.
+  setCursorStyle(id) {
+    this.cursorTool = id;
+    this.settings.cursorStyle = { cursor: "cross", dot: "dot", arrowcursor: "arrow" }[id] || "cross";
+    this.applyCursorClass();
+    this.panes.forEach((p) => p.applyChartSettings());
+    this.persist();
+  }
+  applyCursorClass() {
+    const s = this.settings.cursorStyle || "cross";
+    document.body.classList.toggle("cur-dot", s === "dot");
+    document.body.classList.toggle("cur-arrow", s === "arrow");
+  }
+
   setTool(tool) {
     this.tool = tool;
+    // with the cursor selected, the button for the chosen cursor style is the lit one
+    const shown = tool === "cursor" ? this.cursorTool || "cursor" : tool;
     document
       .querySelectorAll("#drawbar [data-tool]")
-      .forEach((b) => b.classList.toggle("active", b.dataset.tool === tool));
+      .forEach((b) => b.classList.toggle("active", b.dataset.tool === shown));
     // a tool picked by a shortcut shows on its group's button
-    const inFly = document.querySelector(`#drawbar .dg-fly [data-tool="${tool}"]`);
+    const inFly = document.querySelector(`#drawbar .dg-fly [data-tool="${shown}"]`);
     if (inFly) {
       const main = inFly.closest(".dg").firstElementChild;
-      main.dataset.tool = tool;
+      main.dataset.tool = shown;
       main.title = inFly.title;
       main.innerHTML = inFly.querySelector("svg").outerHTML;
       main.classList.add("active");

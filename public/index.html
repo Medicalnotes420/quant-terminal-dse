@@ -112,8 +112,12 @@
           <path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20h4" /></svg
         ><span>Alert</span>
       </button>
+      <button id="tbMoreBtn" class="tb icon" title="More tools" aria-label="More tools" hidden>
+        <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+      </button>
       <div class="spacer"></div>
       <div class="tb-right">
+      <button id="tbCustomBtn" class="tb icon" title="Customize the top bar: show, hide and reorder its items" aria-label="Customize the top bar"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" /></svg></button>
       <button id="fsBtn" class="tb icon" title="Full screen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg></button>
       <button id="snapBtn" class="tb icon" title="Take a snapshot (downloads the chart as an image)">
         <svg viewBox="0 0 24 24">
@@ -137,6 +141,7 @@
       <span id="status" class="status" title="Data status"></span>
       </div>
     </header>
+    <div id="tbMore" class="tb-more hidden" role="menu"></div>
 
   <div class="main">
       <nav class="drawbar" id="drawbar"></nav>
@@ -168,6 +173,7 @@
           </div>
         </div>
         <div id="bottom" class="bottom collapsed">
+        <div class="bottom-resizer" id="bottomResizer" title="Drag to resize, double-click to reset"></div>
           <div class="tabs" id="bottomTabs">
             <button data-tab="tester" class="active">Strategy tester</button>
             <button data-tab="seasonals">Seasonals</button>

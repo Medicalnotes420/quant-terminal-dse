@@ -287,6 +287,17 @@ export class ChartPane {
     }, true);
     document.addEventListener("mousemove", (e) => {
       const g = this._drag;
+      if (g?.item.fx !== undefined) {
+        // an anchored item follows the pointer on the pane
+        const q = domP(e);
+        if (q.point) {
+          g.item.fx = q.point.x / this.chart.timeScale().width();
+          g.item.fy = q.point.y / this.chart.panes()[0].getHeight();
+          g.moved = true;
+          this.drawings.update();
+        }
+        return;
+      }
       const cur = g && this.pointAt(domP(e));
       if (!cur) return;
       const dt = cur.time - g.start.time,
@@ -1290,7 +1301,7 @@ export class ChartPane {
         if (l2 - l1 >= 2) this.chart.timeScale().setVisibleLogicalRange({ from: l1, to: l2 });
         return;
       }
-      if (["text", "note", "callout", "signpost", "balloon"].includes(item.type)) {
+      if (["text", "note", "callout", "signpost", "balloon", "anchoredtext", "anchorednote"].includes(item.type)) {
         const text = prompt("Note text:", "");
         if (!text) {
           d.update();
@@ -1298,6 +1309,10 @@ export class ChartPane {
           return;
         }
         item.text = text;
+      }
+      if (item.type === "anchoredtext" || item.type === "anchorednote") {
+        item.fx = p.point.x / this.chart.timeScale().width();
+        item.fy = p.point.y / this.chart.panes()[0].getHeight();
       }
       d.items.push(item);
       d.selected = item;
@@ -1329,7 +1344,7 @@ export class ChartPane {
       });
     } else if (kind === "Bar") Object.assign(o, { upColor: cs.bodyUp || up, downColor: cs.bodyDown || down });
     this.main.applyOptions(o);
-    const hidden = cs.crosshair === "hidden";
+    const hidden = cs.crosshair === "hidden" || ["dot", "arrow"].includes(this.app.settings.cursorStyle);
     const background =
       cs.bgType === "gradient"
         ? { type: LW.ColorType.VerticalGradient, topColor: cs.bgColor || css("--bg"), bottomColor: cs.bgColor2 || css("--panel") }

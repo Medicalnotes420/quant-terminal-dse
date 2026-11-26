@@ -175,6 +175,14 @@ export const TOOLS = [
   { id: "emoji_eyes", label: "Icon eyes", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">👀</text>' },
   { id: "emoji_bell", label: "Icon bell", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">🔔</text>' },
   { id: "emoji_redflag", label: "Icon redflag", points: 1, icon: '<text x="12" y="17.5" font-size="15" text-anchor="middle">🚩</text>' },
+  { id: "dot", label: "Dot", points: 0, icon: '<circle cx="12" cy="12" r="3" fill="currentColor"/>' },
+  { id: "arrowcursor", label: "Arrow", points: 0, icon: '<path d="M6 3l12 8-5 1.5L10.5 18z"/>' },
+  { id: "disjoint", label: "Disjoint channel", points: 4, icon: '<path d="M4 17L14 12M6 8l14-4"/>' },
+  { id: "insidepitchfork", label: "Inside pitchfork", points: 3, icon: '<path d="M5 19L19 5M9 19l10-10M5 15L15 5M7 17L17 7"/>' },
+  { id: "gannsquarefixed", label: "Gann square fixed", points: 2, icon: '<rect x="4" y="4" width="16" height="16"/><path d="M4 4l16 16M12 4v16M4 12h16M4 8h16M8 4v16"/>' },
+  { id: "arrowmarker", label: "Arrow marker", points: 2, icon: '<path d="M4 20l9-9M13 11l-1 6 8-13-13 8z" fill="currentColor"/>' },
+  { id: "anchoredtext", label: "Anchored text", points: 1, icon: '<path d="M5 6h14M12 6v13M9 19h6"/><circle cx="19" cy="19" r="1.4" fill="currentColor"/>' },
+  { id: "anchorednote", label: "Anchored note", points: 1, icon: '<path d="M5 4h14v11h-6l-3 3v-3H5z"/><circle cx="19" cy="20" r="1.4" fill="currentColor"/>' },
   {
     id: "text",
     label: "Text note",
@@ -497,13 +505,14 @@ export class DrawingLayer {
         break;
       }
       case "pitchfork":
+      case "insidepitchfork":
       case "schiff":
       case "mschiff": {
         if (!c) {
           line(a.x, a.y, b.x, b.y);
           break;
         }
-        const S = d.type === "pitchfork" ? a : d.type === "schiff" ? { x: a.x, y: (a.y + b.y) / 2 } : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const S = d.type === "pitchfork" || d.type === "insidepitchfork" ? a : d.type === "schiff" ? { x: a.x, y: (a.y + b.y) / 2 } : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         const mid = { x: (b.x + c.x) / 2, y: (b.y + c.y) / 2 };
         const dx = mid.x - S.x,
           dy = mid.y - S.y,
@@ -513,6 +522,7 @@ export class DrawingLayer {
         ray(S);
         ray(b);
         ray(c);
+        if (d.type === "insidepitchfork") for (const t of [0.25, 0.75]) ray({ x: b.x + (c.x - b.x) * t, y: b.y + (c.y - b.y) * t });
         ctx.globalAlpha = 0.07;
         ctx.beginPath();
         ctx.moveTo(b.x, b.y);
@@ -648,9 +658,16 @@ export class DrawingLayer {
         break;
       }
       case "gannbox":
+      case "gannsquarefixed":
       case "gannsquare": {
         let x2 = b.x,
           y2 = b.y;
+        if (d.type === "gannsquarefixed") {
+          // a fixed ratio: every bar across is 0.5% of the starting price up or down
+          const nb = Math.abs(this.pane.logicalOf(b.time) - this.pane.logicalOf(a.time));
+          const yy = this.y(a.price + (b.price >= a.price ? 1 : -1) * nb * a.price * 0.005);
+          if (yy != null) y2 = yy;
+        }
         if (d.type === "gannsquare") {
           const side = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
           x2 = a.x + Math.sign(b.x - a.x || 1) * side;
@@ -864,6 +881,60 @@ export class DrawingLayer {
           const up = (!pts[i - 1] || p.y < pts[i - 1].y) && (!pts[i + 1] || p.y < pts[i + 1].y);
           label(WAVES[d.type][i] || "", p.x, p.y + (up ? -12 : 12), "center", color);
         });
+        break;
+      }
+      case "disjoint": {
+        line(a.x, a.y, b.x, b.y);
+        if (!c) break;
+        const e = pts[3] || c;
+        line(c.x, c.y, e.x, e.y);
+        ctx.globalAlpha = 0.1;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(e.x, e.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "arrowmarker": {
+        const ang = Math.atan2(b.y - a.y, b.x - a.x),
+          len = Math.hypot(b.x - a.x, b.y - a.y);
+        if (len < 2) break;
+        const head = Math.min(20, len * 0.55),
+          sw = 5,
+          nx = -Math.sin(ang),
+          ny = Math.cos(ang),
+          bx = b.x - Math.cos(ang) * head,
+          by = b.y - Math.sin(ang) * head;
+        ctx.beginPath();
+        ctx.moveTo(a.x + (nx * sw) / 2, a.y + (ny * sw) / 2);
+        ctx.lineTo(bx + (nx * sw) / 2, by + (ny * sw) / 2);
+        ctx.lineTo(bx + nx * head * 0.6, by + ny * head * 0.6);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(bx - nx * head * 0.6, by - ny * head * 0.6);
+        ctx.lineTo(bx - (nx * sw) / 2, by - (ny * sw) / 2);
+        ctx.lineTo(a.x - (nx * sw) / 2, a.y - (ny * sw) / 2);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case "anchoredtext":
+      case "anchorednote": {
+        // pinned to a spot on the pane (a share of its width and height), so it stays put as the chart moves
+        const ax = (d.fx ?? 0.5) * size.width,
+          ay = (d.fy ?? 0.5) * size.height;
+        if (d.type === "anchorednote") label(d.text || "Note", ax, ay, "left", "#b8860b");
+        else {
+          ctx.save();
+          ctx.font = "13px Inter, \"Segoe UI Variable Text\", \"Segoe UI\", system-ui, sans-serif";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(d.text || "Text", ax, ay);
+          ctx.restore();
+        }
         break;
       }
       case "arrow": {
@@ -1184,7 +1255,7 @@ export class DrawingLayer {
         }
         break;
     }
-    if (active && d.type !== "brush" && d.type !== "highlighter") {
+    if (active && d.type !== "brush" && d.type !== "highlighter" && d.fx === undefined) {
       ctx.fillStyle = "#fff";
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
@@ -1219,7 +1290,13 @@ export class DrawingLayer {
       if (pts.some((p) => p.x == null || p.y == null)) continue;
       const [a, b] = pts;
       let dist = Infinity;
-      if (d.type === "hline") dist = Math.abs(y - a.y);
+      if (d.fx !== undefined) {
+        const W = this.pane.chart.timeScale().width(),
+          H = this.pane.chart.panes()[0].getHeight();
+        const ax = d.fx * W,
+          ay = d.fy * H;
+        dist = x >= ax - 4 && x <= ax + 140 && Math.abs(y - ay) < 12 ? 0 : Infinity;
+      } else if (d.type === "hline") dist = Math.abs(y - a.y);
       else if (d.type === "hray")
         dist = x >= a.x - 4 ? Math.abs(y - a.y) : Infinity;
       else if (d.type === "vline") dist = Math.abs(x - a.x);
@@ -1251,7 +1328,7 @@ export class DrawingLayer {
           x >= a.x - 4 && x <= a.x + 120 && Math.abs(y - a.y) < 12
             ? 0
             : Infinity;
-      else if (["rect", "fib", "fibext", "measure", "long", "short", "daterangeprice", "flat", "rotated", "pitchfork", "schiff", "mschiff", "pitchfan", "fibchannel", "fibtimezone", "trendfibtime", "fibcircles", "fibspiral", "fibarcs", "fibwedge", "fibfan", "gannbox", "gannsquare", "gannfan", "trianglepattern", "sine", "balloon", "curve", "doublecurve", "arc", "projection", "fixedvp", "barspattern"].includes(d.type)) {
+      else if (["rect", "fib", "fibext", "measure", "long", "short", "daterangeprice", "flat", "rotated", "pitchfork", "schiff", "mschiff", "pitchfan", "fibchannel", "fibtimezone", "trendfibtime", "fibcircles", "fibspiral", "fibarcs", "fibwedge", "fibfan", "gannbox", "gannsquare", "gannfan", "trianglepattern", "sine", "balloon", "curve", "doublecurve", "arc", "projection", "fixedvp", "barspattern", "disjoint", "insidepitchfork", "gannsquarefixed"].includes(d.type)) {
         const xs = pts.map((p) => p.x),
           ys = pts.map((p) => p.y);
         const inside =
