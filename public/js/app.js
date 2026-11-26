@@ -60,6 +60,7 @@ class App {
           indicators: [
             { uid: newUid(), id: "ema", params: { length: 21 } },
             { uid: newUid(), id: "rsi", params: {} },
+            { uid: newUid(), id: "macd", params: {} },
             { uid: newUid(), id: "chartpatterns", params: {} },
           ],
         },
@@ -513,6 +514,19 @@ class App {
       this.syncToolbar();
       this.persist();
     };
+    $("#navPill").onclick = (e) => {
+      const nav = e.target.closest("button")?.dataset.nav;
+      const p = this.active;
+      if (!p || !nav) return;
+      if (nav === "left") p.scrollBy(-0.33);
+      else if (nav === "right") p.scrollBy(0.33);
+      else if (nav === "latest") p.scrollToLatest();
+      else p.resetView();
+    };
+    $("#prevShare").onclick = () => this.stepShare(-1);
+    $("#nextShare").onclick = () => this.stepShare(1);
+    $("#favShare").onclick = () => this.toggleFavorite();
+    $("#tplBtn").onclick = () => this.openTemplates();
     $("#tbUndo").onclick = () => this.stepDrawings(false);
     $("#tbRedo").onclick = () => this.stepDrawings(true);
     $("#zoomInBtn").onclick = () => this.active?.zoomBy(0.7);
@@ -543,6 +557,7 @@ class App {
     const p = this.active;
     if (!p) return;
     $("#symbolLabel").textContent = ticker(p.cfg.symbol);
+    this.syncFavorite();
     $("#symbolBtn").title =
       `${p.cfg.symbol} — change symbol (or just start typing)`;
     document
@@ -575,6 +590,82 @@ class App {
     }
     this.syncToolbar();
     this.persist();
+  }
+
+  // ---------- previous / next share and the Favorites star (the pill at the foot of the chart) ----------
+  favorites() {
+    return this.state.watchlists[this.state.activeWatchlist] || [];
+  }
+  stepShare(dir) {
+    const list = this.favorites();
+    if (!list.length) return this.toast("Add shares to Favorites first (the star beside the chart).");
+    const at = list.indexOf(this.active.cfg.symbol);
+    const next = at < 0 ? (dir > 0 ? 0 : list.length - 1) : (at + dir + list.length) % list.length;
+    this.setSymbol(list[next]);
+  }
+  toggleFavorite() {
+    const sym = this.active?.cfg.symbol;
+    if (!sym) return;
+    const list = this.favorites();
+    this.state.watchlists[this.state.activeWatchlist] = list.includes(sym) ? list.filter((s) => s !== sym) : [...list, sym];
+    this.persist();
+    this.syncFavorite();
+    this.panels?.refreshSide();
+  }
+  syncFavorite() {
+    const on = this.favorites().includes(this.active?.cfg.symbol);
+    const b = $("#favShare");
+    b.classList.toggle("on", on);
+    b.title = on ? "Remove from Favorites" : "Add to Favorites";
+  }
+
+  // ---------- indicator templates: a named set of indicators, saved from this chart and loaded onto any chart ----------
+  openTemplates() {
+    const p = this.active;
+    if (!p) return;
+    const builtin = () => [
+      { id: "ema", params: { length: 14 } },
+      { id: "rsi", params: {} },
+      { id: "macd", params: {} },
+      { id: "chartpatterns", params: {} },
+    ];
+    const saved = (this.state.templates ||= {});
+    const card = this.modal(
+      "Indicator templates",
+      `<div class="list" id="tplList"></div><div class="tpl-save"><input class="search-in" id="tplName" placeholder="Name for the indicators on this chart" autocomplete="off"><button class="btn" id="tplSave">Save</button></div>`,
+    );
+    const apply = (inds) => {
+      p.cfg.indicators = inds.map((i) => ({ uid: newUid(), id: i.id, params: structuredClone(i.params || {}) }));
+      p.render(false);
+      this.persist();
+      this.closeModal();
+    };
+    const draw = () => {
+      const row = (name, extra) => `<div class="tpl-row" data-name="${esc(name)}"><span>${esc(name)}</span>${extra}<button class="btn small" data-act="apply">Apply</button></div>`;
+      card.querySelector("#tplList").innerHTML =
+        row("BullBD default (MA, RSI, MACD, patterns)", "") +
+        Object.keys(saved).map((n) => row(n, '<button class="btn small" data-act="del" title="Delete this template">Delete</button>')).join("");
+    };
+    draw();
+    card.querySelector("#tplList").onclick = (e) => {
+      const act = e.target.dataset.act;
+      const name = e.target.closest(".tpl-row")?.dataset.name;
+      if (!act || !name) return;
+      if (act === "del") {
+        delete saved[name];
+        this.persist();
+        draw();
+      } else apply(name in saved ? saved[name] : builtin());
+    };
+    card.querySelector("#tplSave").onclick = () => {
+      const name = card.querySelector("#tplName").value.trim();
+      if (!name) return this.toast("Type a name for the template first.");
+      saved[name] = p.cfg.indicators.map(({ id, params }) => ({ id, params: structuredClone(params || {}) }));
+      this.persist();
+      card.querySelector("#tplName").value = "";
+      draw();
+      this.toast(`Saved "${name}" with ${saved[name].length} indicators.`);
+    };
   }
 
   buildRangeBar() {

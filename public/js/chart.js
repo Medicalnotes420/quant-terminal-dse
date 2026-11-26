@@ -933,7 +933,7 @@ export class ChartPane {
     const chg = b && prev ? ((b.close - prev.close) / prev.close) * 100 : null;
     const cls = chg == null ? "" : chg >= 0 ? "up" : "down";
     const name = `${ticker(this.cfg.symbol)} · ${this.cfg.tf} · ${this.provider || exchange(this.cfg.symbol)}`;
-    let html = `<div class="row"><span class="title" data-act="symbol">${esc(name)}</span>${this.liveOn ? '<span class="live" title="The exchange is open: this chart refreshes by itself">● live</span>' : ""}`;
+    let html = `<div class="row"><span class="title" data-act="symbol">${esc(name)}</span>${this.liveOn ? '<span class="live" title="The exchange is open: this chart refreshes by itself">● live</span>' : ""}<button class="lg-toggle" data-act="lgtoggle" title="Hide or show the indicator legend"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" /></svg></button>`;
     if (b) {
       const day = this.step < 86400
         ? new Date(b.time * 1000).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
@@ -976,6 +976,7 @@ export class ChartPane {
       if (!btn) return;
       const act = btn.dataset.act;
       if (act === "symbol") return this.app.openSymbolSearch();
+      if (act === "lgtoggle") return void this.el.classList.toggle("legend-min");
       if (act === "addpatterns") return void this.addIndicator("chartpatterns");
       if (act === "rmcompare") {
         this.cfg.compare = this.cfg.compare.filter(
@@ -1298,6 +1299,29 @@ export class ChartPane {
     const r = this.chart.timeScale().getVisibleLogicalRange();
     const w = r ? r.to - r.from : 160;
     this.chart.timeScale().setVisibleLogicalRange({ from: l - w / 2, to: l + w / 2 });
+  }
+
+  // Scroll the view by a fraction of its width (negative = towards older bars).
+  scrollBy(frac) {
+    const r = this.chart.timeScale().getVisibleLogicalRange();
+    if (!r) return;
+    const d = (r.to - r.from) * frac;
+    this.chart.timeScale().setVisibleLogicalRange({ from: r.from + d, to: r.to + d });
+  }
+
+  // Jump so the newest bar sits at the right edge, keeping the zoom.
+  scrollToLatest() {
+    const r = this.chart.timeScale().getVisibleLogicalRange();
+    const n = this.shown.length;
+    if (!r || !n) return;
+    this.chart.timeScale().setVisibleLogicalRange({ from: n + 8 - (r.to - r.from), to: n + 8 });
+  }
+
+  // Back to the opening view: the last 160 bars, price scale on auto.
+  resetView() {
+    const n = this.shown.length;
+    this.chart.priceScale("right").applyOptions({ autoScale: true });
+    if (n) this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 160), to: n + 8 });
   }
 
   // Zoom in (f < 1) or out (f > 1), keeping the right-hand edge where it is.

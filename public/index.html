@@ -53,6 +53,10 @@
         <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 6-8 3 3" /></svg
         ><span>Indicators</span>
       </button>
+      <button id="tplBtn" class="tb" title="Indicator templates: save the indicators on this chart, or load a saved set">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16v6H4zM4 14h7v6H4zM15 14h5v6h-5z" /></svg
+        ><span>Templates</span>
+      </button>
       <div class="sep"></div>
       <button id="tbUndo" class="tb icon" title="Undo drawing change (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 8" /></svg></button>
       <button id="tbRedo" class="tb icon" title="Redo (Ctrl+Y)"><svg viewBox="0 0 24 24"><path d="M15 7l5 5-5 5M20 12H10a6 6 0 0 0 0 8" /></svg></button>
@@ -126,7 +130,20 @@
       <nav class="drawbar" id="drawbar"></nav>
       <button id="drawOpen" class="draw-open" title="Show the drawing toolbar" aria-label="Show the drawing toolbar"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg></button>
       <section class="center">
-        <div id="grid" class="grid"></div>
+        <div class="chart-area">
+          <div id="grid" class="grid"></div>
+          <div class="pill nav-pill" id="navPill">
+            <button data-nav="left" title="Scroll to the left"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></svg></button>
+            <button data-nav="right" title="Scroll to the right"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg></button>
+            <button data-nav="latest" title="Scroll to the most recent bar"><svg viewBox="0 0 24 24"><path d="M6 6l6 6-6 6M13 6l6 6-6 6" /></svg></button>
+            <button data-nav="reset" title="Reset chart"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4" /></svg></button>
+          </div>
+          <div class="pill share-pill" id="sharePill">
+            <button id="prevShare" title="Previous share in Favorites"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6" /></svg></button>
+            <button id="favShare" title="Add to Favorites"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z" /></svg></button>
+            <button id="nextShare" title="Next share in Favorites"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></button>
+          </div>
+        </div>
         <div id="rangeBar" class="rangebar" title="Zoom the chart to a time span (daily data, so no intraday)">
           <button id="gotoBtn" title="Go to a date"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M8 3v4M16 3v4" /></svg>Go to</button>
           <input type="date" id="gotoDate" class="goto-date" aria-label="Go to date" tabindex="-1" />

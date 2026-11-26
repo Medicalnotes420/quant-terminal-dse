@@ -1215,3 +1215,22 @@ body { font-family: Roboto, -apple-system, "Helvetica Neue", Helvetica, Arial, "
 .rangebar #tzSel { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; padding: 3px 2px; }
 .rangebar #tzSel:hover { color: var(--text); }
 .ob-row { grid-template-columns: minmax(0, 1.6fr) 1fr 1fr 24px; }
+
+/* chart-area wraps the grid so the pills can float over it; the legend can be folded away; templates list */
+.chart-area { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.pill { position: absolute; bottom: 12px; z-index: 9; display: flex; gap: 2px; padding: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+.pill button { width: 30px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.pill button:hover { background: var(--hover); }
+.pill svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.share-pill { left: 50%; transform: translateX(-50%); }
+.share-pill #favShare.on svg { fill: #f7a600; stroke: #f7a600; }
+.nav-pill { right: 84px; opacity: 0; transition: opacity .15s; }
+.chart-area:hover .nav-pill { opacity: 1; }
+.lg-toggle { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 2px; vertical-align: middle; }
+.lg-toggle svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.legend-min .lg-toggle svg { transform: rotate(180deg); }
+.legend-min .legend .row.ind, .legend-min .legend .note { display: none; }
+.tpl-row { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border); }
+.tpl-row span { flex: 1; }
+.tpl-save { display: flex; gap: 8px; margin-top: 12px; }
+.tpl-save input { flex: 1; }
