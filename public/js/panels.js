@@ -340,7 +340,7 @@ export function initPanels(app) {
         .map((s) => {
           const q = quotes[s] || {};
           const live = app.prices[s] ?? q.price;
-          return `<div class="wl-row ${s === cur ? "current" : ""}" data-sym="${esc(s)}"><span class="sym">${esc(ticker(s))} <span class="ex">${esc(exchange(s))}</span></span><span class="px">${fmtPrice(live)}</span><span class="chg ${q.changePct >= 0 ? "up" : "down"}">${fmtPct(q.changePct)}</span><button class="x" title="Remove"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
+          return `<div class="wl-row ${s === cur ? "current" : ""}" data-sym="${esc(s)}"><span class="sym ${q.changePct >= 0 ? "up" : "down"}">${esc(ticker(s))} <span class="ex">${esc(exchange(s))}</span></span><span class="px">${fmtPrice(live)}</span><span class="chg ${q.changePct >= 0 ? "up" : "down"}">${fmtPct(q.changePct)}</span><button class="x" title="Remove"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
         })
         .join("") ||
       '<div class="pad hint-text">Empty list. Add a symbol above.</div>';
@@ -370,7 +370,7 @@ export function initPanels(app) {
     side.innerHTML = `<div class="wl-head"><span class="hint-text" id="shNote">Loading…</span></div>
       <div style="padding:8px"><input class="in" id="shQ" placeholder="Search shares" style="width:100%" value="${esc(shareQ)}"></div>
       <div class="sh-filters"><label>Category<select class="in" id="shCat"></select></label><label>Sector<select class="in" id="shSec"></select></label></div>
-      <div class="sh-head">${[["ticker", "Share"], ["price", "Last"], ["changePct", "Change"], ["volume", "Volume"]].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join("")}</div>
+      <div class="sh-head">${[["ticker", "Symbol"], ["price", "LTP"], ["changePct", "Chg(%)"], ["volume", "Volume"]].map(([k, l]) => `<button data-k="${k}" data-l="${l}">${l}</button>`).join("")}</div>
       <div id="shRows"></div>`;
     $("#shQ").oninput = (e) => {
       shareQ = e.target.value.trim().toUpperCase();
@@ -421,10 +421,16 @@ export function initPanels(app) {
       .filter((r) => !shareCat || r.category === shareCat)
       .filter((r) => !shareSec || r.sector === shareSec)
       .sort((a, b) => (key === "ticker" ? (a.ticker < b.ticker ? -1 : 1) * dir : ((a[key] ?? -Infinity) - (b[key] ?? -Infinity)) * dir));
-    $("#shNote").textContent = `${rows.length} of ${shareRows.length} shares · last close ${shareRows[0]?.date || ""} · star = ${app.state.activeWatchlist}`;
-    document.querySelectorAll(".sh-head button").forEach((b) => b.classList.toggle("on", b.dataset.k === key));
+    // advancers, decliners and unchanged among the shares listed, like the summary row at the top of BullBD's panel
+    const adv = rows.filter((r) => r.changePct > 0).length, dec = rows.filter((r) => r.changePct < 0).length;
+    $("#shNote").innerHTML = `<b class="up">▲ ${adv}</b> <b class="down">▼ ${dec}</b> <b>= ${rows.length - adv - dec}</b> <span>· ${rows.length} of ${shareRows.length} shares · last close ${esc(shareRows[0]?.date || "")}</span>`;
+    document.querySelectorAll(".sh-head button").forEach((b) => {
+      const on = b.dataset.k === key;
+      b.classList.toggle("on", on);
+      b.textContent = b.dataset.l + (on ? (dir > 0 ? " ↑" : " ↓") : "");
+    });
     box.innerHTML = rows
-      .map((r) => `<div class="wl-row sh-row ${r.symbol === cur ? "current" : ""}" data-sym="${esc(r.symbol)}" title="${esc([r.name, r.sector, r.category && `Category ${r.category}`].filter(Boolean).join(" · "))}"><span class="sh-name"><button class="star ${mine.has(r.symbol) ? "on" : ""}" title="${mine.has(r.symbol) ? "Remove from" : "Add to"} Favorites">${mine.has(r.symbol) ? "★" : "☆"}</button><span class="sym">${esc(r.ticker)}</span></span><span class="px">${fmtPrice(r.price)}</span><span class="chg ${r.changePct >= 0 ? "up" : "down"}">${fmtPct(r.changePct)}</span><span class="vol">${COMPACT.format(r.volume)}</span></div>`)
+      .map((r) => `<div class="wl-row sh-row ${r.symbol === cur ? "current" : ""}" data-sym="${esc(r.symbol)}" title="${esc([r.name, r.sector, r.category && `Category ${r.category}`].filter(Boolean).join(" · "))}"><span class="sh-name"><button class="star ${mine.has(r.symbol) ? "on" : ""}" title="${mine.has(r.symbol) ? "Remove from" : "Add to"} Favorites">${mine.has(r.symbol) ? "★" : "☆"}</button><span class="sym ${r.changePct >= 0 ? "up" : "down"}">${esc(r.ticker)}</span></span><span class="px">${fmtPrice(r.price)}</span><span class="chg ${r.changePct >= 0 ? "up" : "down"}">${fmtPct(r.changePct)}</span><span class="vol">${COMPACT.format(r.volume)}</span></div>`)
       .join("") || '<div class="pad hint-text">No share matches.</div>';
   }
 
@@ -1831,6 +1837,10 @@ export function initPanels(app) {
   };
   P.showBottom = showBottom;
   P.showSide = showSide;
+  P.refreshSide = () => {
+    shareRows = null; // the share list is fetched again
+    showSide(sideTab);
+  };
   P.openAlertDialog = openAlertDialog;
   let lastSymbol = null;
   P.onActiveChange = () => {

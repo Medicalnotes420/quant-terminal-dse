@@ -261,6 +261,7 @@ class App {
     const sync = () => {
       const cur = document.querySelector("#sideTabs .active")?.dataset.tab;
       $("#sideTitle").textContent = document.querySelector("#sideTabs .active")?.textContent.trim() || "";
+      $("#sideIcon").innerHTML = rail.querySelector(`[data-tab="${cur}"] svg`)?.outerHTML || "";
       rail.querySelectorAll("button").forEach((b) => b.classList.toggle("active", !this.state.sideCollapsed && b.dataset.tab === cur));
     };
     const collapse = (on) => {
@@ -270,6 +271,7 @@ class App {
       sync();
     };
     $("#sideClose").onclick = () => collapse(true);
+    $("#sideRefresh").onclick = () => this.panels.refreshSide();
     rail.onclick = (e) => {
       const b = e.target.closest("button");
       if (!b) return;

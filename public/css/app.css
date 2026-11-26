@@ -1190,3 +1190,20 @@ body { font-family: Roboto, -apple-system, "Helvetica Neue", Helvetica, Arial, "
 .drawbar .dg-fly button { width: 100%; }
 .drawbar .dg-fly button svg { width: 22px; height: 22px; }
 .drawbar .dg-collapse { align-self: center; width: 20px; height: 36px; }
+
+/* right panel like BullBD's: icon + title + refresh in the header, a summary row, a flat LTP table with red and green symbols */
+.side-head { gap: 8px; justify-content: flex-start; }
+.side-head #sideTitle { flex: 1; }
+.side-head #sideIcon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.side-head #sideIcon { display: grid; color: var(--text); }
+#shNote { display: block; padding: 8px 14px; font-size: 13px; color: var(--muted); }
+#shNote b { margin-right: 6px; font-size: 14px; }
+.sh-head { background: var(--hover); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.sh-head button { font-weight: 500; font-size: 12px; color: var(--muted); }
+.sh-head button.on { color: var(--text); }
+.sh-row .sym, .wl-row .sym { font-weight: 500; }
+.sh-row { min-height: 32px; border-bottom: 1px solid var(--border); }
+/* a narrow panel keeps the symbol readable: the symbol column never shrinks below 92px */
+.sh-head, .wl-row.sh-row { grid-template-columns: minmax(92px, 1.5fr) minmax(38px, .9fr) minmax(54px, 1fr) minmax(36px, .9fr); gap: 4px; padding: 0 8px; font-size: 12px; }
+.sh-head button:first-child { padding-left: 22px; }
+.sh-head button { white-space: nowrap; padding: 2px 0; }
