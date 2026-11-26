@@ -387,6 +387,7 @@ export class ChartPane {
     this.main.attachPrimitive(this.drawings);
     this.markers = LW.createSeriesMarkers(this.main, []);
     this.mainType = t;
+    queueMicrotask(() => this.applyChartSettings());
     if (
       !PRICE_ONLY.includes(t) &&
       this.app.settings.volume !== false
@@ -564,7 +565,12 @@ export class ChartPane {
           color: b.close >= b.open ? css("--up") : css("--down"),
         };
       default: {
-        const c = this.barColorAt?.get(b.time);
+        let c = this.barColorAt?.get(b.time);
+        const pc = !c && this.prevClose?.get(b.time);
+        if (pc != null && pc !== false) {
+          const cs = this.app.settings.chart;
+          c = b.close >= pc ? cs.bodyUp || css("--up") : cs.bodyDown || css("--down");
+        }
         return { time, open: b.open, high: b.high, low: b.low, close: b.close, ...(c ? (this.mainType === "bars" ? { color: c } : { color: c, borderColor: c, wickColor: c }) : {}) };
       }
     }
@@ -600,6 +606,12 @@ export class ChartPane {
     )
       this.makeMainSeries();
     this.shown = this.visibleBars();
+    // colour bars by the previous close (Chart settings > Symbol): remember each bar's previous close
+    this.prevClose = null;
+    if (this.app.settings.chart?.colorPrev) {
+      this.prevClose = new Map();
+      for (let i = 1; i < this.shown.length; i++) this.prevClose.set(this.shown[i].time, this.shown[i - 1].close);
+    }
     this.times = this.shown.map((b) => this.toChart(b.time));
     const last = this.shown.at(-1)?.close || 1;
     const precision = last >= 100 ? 2 : last >= 1 ? 4 : last >= 0.01 ? 6 : 8;
@@ -635,6 +647,7 @@ export class ChartPane {
     this.renderCompare();
     this.renderIndicators();
     this.drawings.update();
+    this.applyChartSettings();
     this.updateHiLo();
     if (resetView && this.shown.length)
       this.chart.timeScale().setVisibleLogicalRange({
@@ -939,7 +952,7 @@ export class ChartPane {
         ? new Date(b.time * 1000).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
         : new Date(b.time * 1000).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
       const abs = prev ? b.close - prev.close : null;
-      html += `<span class="ohlc ${cls}"><span class="when">${esc(day)}</span><span><b>O</b>${fmtPrice(b.open)}</span><span><b>H</b>${fmtPrice(b.high)}</span><span><b>L</b>${fmtPrice(b.low)}</span><span><b>C</b>${fmtPrice(b.close)}</span><span>${abs == null ? "" : `${abs >= 0 ? "+" : ""}${fmtPrice(abs)} `}${fmtPct(chg)}</span>${b.volume ? `<span class="vol"><b>Vol</b>${fmtNum(b.volume)}</span>` : ""}</span>`;
+      html += `<span class="ohlc ${cls}"><span class="when">${esc(day)}</span><span class="ov"><b>O</b>${fmtPrice(b.open)}</span><span class="ov"><b>H</b>${fmtPrice(b.high)}</span><span class="ov"><b>L</b>${fmtPrice(b.low)}</span><span class="ov"><b>C</b>${fmtPrice(b.close)}</span><span class="ch">${abs == null ? "" : `${abs >= 0 ? "+" : ""}${fmtPrice(abs)} `}${fmtPct(chg)}</span>${b.volume ? `<span class="vol"><b>Vol</b>${fmtNum(b.volume)}</span>` : ""}</span>`;
     }
     html += "</div>";
     for (const sym of this.cfg.compare) {
@@ -966,7 +979,7 @@ export class ChartPane {
             .join(" ");
       const short =
         /\(([^)]+)\)$/.exec(def.name)?.[1].split(" / ")[0] || def.name;
-      html += `<div class="row ind" data-uid="${ind.uid}" style="${ind.hidden ? "opacity:.45" : ""}"><span class="name">${esc(short)} ${esc(params)}</span><span class="vals">${vals}</span><span class="acts"><button data-act="settings" title="Settings">${ICON.gear}</button><button data-act="hide" title="Show/hide">${ICON.eye}</button><button data-act="remove" title="Remove">${ICON.x}</button></span></div>`;
+      html += `<div class="row ind" data-uid="${ind.uid}" style="${ind.hidden ? "opacity:.45" : ""}"><span class="name"><span class="it">${esc(short)}</span> <span class="ia">${esc(params)}</span></span><span class="vals">${vals}</span><span class="acts"><button data-act="settings" title="Settings">${ICON.gear}</button><button data-act="hide" title="Show/hide">${ICON.eye}</button><button data-act="remove" title="Remove">${ICON.x}</button></span></div>`;
     }
     if (!this.cfg.indicators.some((x) => x.id === "chartpatterns"))
       html += `<div class="row ind"><span class="name muted">Chart patterns off</span><span class="acts"><button class="btn small" data-act="addpatterns">Add</button></span></div>`;
@@ -1268,6 +1281,47 @@ export class ChartPane {
     d.update();
   }
 
+  // Chart settings (the Settings dialog's Symbol, Scales and Appearance tabs) applied to this chart.
+  applyChartSettings() {
+    const cs = this.app.settings.chart;
+    if (!cs || !this.main) return;
+    const up = css("--up"),
+      down = css("--down");
+    const o = { priceLineVisible: cs.lastLine, lastValueVisible: cs.lastLabel };
+    if (cs.precision !== "auto") o.priceFormat = { type: "price", precision: Number(cs.precision), minMove: 1 / 10 ** Number(cs.precision) };
+    const kind = this.main.seriesType();
+    if (kind === "Candlestick") {
+      const hollow = this.mainType === "hollow";
+      Object.assign(o, {
+        upColor: hollow ? "rgba(0,0,0,0)" : cs.bodyUp || up,
+        downColor: cs.bodyDown || down,
+        borderUpColor: cs.borderUp || up,
+        borderDownColor: cs.borderDown || down,
+        wickUpColor: cs.wickUp || up,
+        wickDownColor: cs.wickDown || down,
+        borderVisible: hollow || !!(cs.borderUp || cs.borderDown),
+      });
+    } else if (kind === "Bar") Object.assign(o, { upColor: cs.bodyUp || up, downColor: cs.bodyDown || down });
+    this.main.applyOptions(o);
+    const hidden = cs.crosshair === "hidden";
+    this.chart.applyOptions({
+      layout: { fontSize: cs.fontSize },
+      grid: { vertLines: { visible: cs.vGrid }, horzLines: { visible: cs.hGrid } },
+      crosshair: { mode: cs.crosshair === "magnet" ? LW.CrosshairMode.Magnet : LW.CrosshairMode.Normal, vertLine: { visible: !hidden }, horzLine: { visible: !hidden } },
+      rightPriceScale: { scaleMargins: { top: cs.marginTop / 100, bottom: cs.marginBottom / 100 } },
+      timeScale: { rightOffset: cs.rightMargin },
+      localization: { dateFormat: cs.dateFormat },
+    });
+    this.wm?.detach();
+    this.wm = null;
+    if (cs.watermark)
+      this.wm = LW.createTextWatermark(this.chart.panes()[0], {
+        horzAlign: "center",
+        vertAlign: "center",
+        lines: [{ text: ticker(this.cfg.symbol), color: "rgba(127,127,127,0.14)", fontSize: 64 }],
+      });
+  }
+
   // "High" and "Low" lines at the extremes of the bars on screen, like BullBD's labels.
   updateHiLo() {
     if (!this.main) return;
@@ -1280,7 +1334,8 @@ export class ChartPane {
     }
     this.hiLoLines = [];
     const r = this.chart.timeScale().getVisibleLogicalRange();
-    if (!r || !this.shown.length || this.cfg.marks === false) return;
+    const cs = this.app.settings.chart || {};
+    if (!r || !this.shown.length || this.cfg.marks === false || cs.hiLoLines === false) return;
     let hi = -Infinity,
       lo = Infinity;
     for (let i = Math.max(0, Math.floor(r.from)); i <= Math.min(this.shown.length - 1, Math.ceil(r.to)); i++) {
@@ -1289,7 +1344,7 @@ export class ChartPane {
     }
     if (!Number.isFinite(hi) || !Number.isFinite(lo)) return;
     const line = (price, title) =>
-      this.main.createPriceLine({ price, title, color: css("--muted"), lineWidth: 1, lineStyle: LW.LineStyle.Dotted, axisLabelVisible: true });
+      this.main.createPriceLine({ price, title, color: css("--muted"), lineWidth: 1, lineStyle: LW.LineStyle.Dotted, axisLabelVisible: cs.hiLoLabels !== false });
     this.hiLoLines = [line(hi, "High"), line(lo, "Low")];
   }
 

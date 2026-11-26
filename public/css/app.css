@@ -1234,3 +1234,22 @@ body { font-family: Roboto, -apple-system, "Helvetica Neue", Helvetica, Arial, "
 .tpl-row span { flex: 1; }
 .tpl-save { display: flex; gap: 8px; margin-top: 12px; }
 .tpl-save input { flex: 1; }
+
+/* Chart settings dialog tabs; the Status line, navigation and pane-button switches */
+.set-tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.set-tabs button { border: 0; background: transparent; color: var(--muted); padding: 8px 12px; cursor: pointer; border-bottom: 2px solid transparent; font: inherit; }
+.set-tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+.set-pane.hidden { display: none; }
+.field.chk { flex-direction: row; align-items: center; gap: 8px; }
+.lg-no-desc .legend .row .title { display: none; }
+.lg-no-status .legend .live { display: none; }
+.lg-no-ohlc .legend .ov { display: none; }
+.lg-no-change .legend .ch { display: none; }
+.lg-no-vol .legend .ohlc .vol { display: none; }
+.lg-no-titles .legend .ind .it { display: none; }
+.lg-no-args .legend .ind .ia { display: none; }
+.lg-no-values .legend .ind .vals { display: none; }
+.nav-never .nav-pill { display: none; }
+.nav-always .nav-pill { opacity: 1; }
+.pane-never .pane-actions, .pane-never .pane-tools { display: none; }
+.pane-always .pane-actions { opacity: 1; }

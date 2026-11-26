@@ -14,6 +14,19 @@ import { initPanels } from "./panels.js";
 const $ = (s, el = document) => el.querySelector(s);
 const TF_QUICK = ["1h", "1D", "1W", "1M"]; // DSE: hourly from StockNow, daily history from your files
 const LAYOUTS = { 1: 1, "2v": 2, "2h": 2, 3: 3, 4: 4, 6: 6, 8: 8, 16: 16 };
+// Chart settings, in the four tabs of BullBD's Chart settings dialog. Empty colours mean "the theme's colour".
+const CHART_DEFAULTS = {
+  // Symbol
+  colorPrev: false, bodyUp: "", bodyDown: "", borderUp: "", borderDown: "", wickUp: "", wickDown: "",
+  lastLine: true, hiLoLines: true, precision: "auto",
+  // Status line
+  sDesc: true, sStatus: true, sOhlc: true, sChange: true, sVolume: true, sTitles: true, sArgs: true, sValues: true,
+  // Scales
+  lastLabel: true, hiLoLabels: true, dateFormat: "dd MMM 'yy",
+  // Appearance
+  fontSize: 11, vGrid: true, hGrid: true, crosshair: "normal", watermark: false, navButtons: "hover", paneButtons: "hover",
+  marginTop: 20, marginBottom: 10, rightMargin: 8,
+};
 const DEFAULT_WATCHLISTS = {
   Main: [
     "DSE:DSEX",
@@ -94,7 +107,9 @@ class App {
       syncCrosshair: false,
       ...this.state.settings,
     };
+    this.settings.chart = { ...CHART_DEFAULTS, ...this.settings.chart };
     this.state.settings = this.settings;
+    this.applyChartClasses();
     for (const p of this.state.panes) if (!isDse(p.symbol)) p.symbol = "DSE:DSEX";
     // ?symbol=DSE:AL-HAJTEX opens that share on the first chart
     const want = new URLSearchParams(location.search).get("symbol");
@@ -1015,20 +1030,92 @@ class App {
     };
   }
 
+  // The Status line, navigation and pane-button settings work through classes on the page.
+  applyChartClasses() {
+    const c = this.settings.chart,
+      b = document.body.classList;
+    b.toggle("lg-no-desc", !c.sDesc);
+    b.toggle("lg-no-status", !c.sStatus);
+    b.toggle("lg-no-ohlc", !c.sOhlc);
+    b.toggle("lg-no-change", !c.sChange);
+    b.toggle("lg-no-vol", !c.sVolume);
+    b.toggle("lg-no-titles", !c.sTitles);
+    b.toggle("lg-no-args", !c.sArgs);
+    b.toggle("lg-no-values", !c.sValues);
+    b.toggle("nav-never", c.navButtons === "never");
+    b.toggle("nav-always", c.navButtons === "always");
+    b.toggle("pane-never", c.paneButtons === "never");
+    b.toggle("pane-always", c.paneButtons === "always");
+  }
+
   openSettings() {
-    const s = this.settings;
+    const s = this.settings,
+      cs = s.chart;
+    const chk = (k, label) => `<label class="field chk"><input type="checkbox" data-ck="${k}" ${cs[k] ? "checked" : ""}> ${label}</label>`;
+    const sel = (k, label, opts) => `<label class="field">${label}<select data-ck="${k}">${opts.map(([v, t]) => `<option value="${esc(String(v))}" ${String(cs[k]) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`;
+    const num = (k, label, min, max) => `<label class="field">${label}<input type="number" data-ck="${k}" min="${min}" max="${max}" value="${cs[k]}"></label>`;
+    const col = (k, label, dflt) => `<label class="field">${label}<input type="color" data-ck="${k}" data-color value="${cs[k] || dflt}"></label>`;
+    const UP = "#089981",
+      DN = "#f23645";
+    const panes = {
+      Symbol: `<div class="form-grid">${chk("colorPrev", "Color bars based on previous close")}
+        ${col("bodyUp", "Body, up", UP)}${col("bodyDown", "Body, down", DN)}${col("borderUp", "Borders, up", UP)}${col("borderDown", "Borders, down", DN)}${col("wickUp", "Wick, up", UP)}${col("wickDown", "Wick, down", DN)}
+        ${chk("lastLine", "Last price line")}${chk("hiLoLines", "High and low price lines")}
+        ${sel("precision", "Precision", [["auto", "Default"], [0, "1"], [1, "0.1"], [2, "0.01"], [3, "0.001"], [4, "0.0001"]])}
+        <label class="field">Time axis<select id="sUtc"><option value="0" ${!s.utc ? "selected" : ""}>My local time</option><option value="1" ${s.utc ? "selected" : ""}>UTC</option></select></label></div>`,
+      "Status line": `<div class="form-grid">${chk("sDesc", "Description")}${chk("sStatus", "Open market status")}${chk("sOhlc", "OHLC values")}${chk("sChange", "Bar change values")}${chk("sVolume", "Volume")}${chk("sTitles", "Indicator titles")}${chk("sArgs", "Indicator arguments")}${chk("sValues", "Indicator values")}</div>`,
+      Scales: `<div class="form-grid">${chk("lastLabel", "Symbol last price label")}${chk("hiLoLabels", "High and low price labels")}
+        ${sel("dateFormat", "Date format", [["dd MMM 'yy", "29 Sep '97"], ["yyyy-MM-dd", "1997-09-29"], ["dd/MM/yyyy", "29/09/1997"], ["MM/dd/yyyy", "09/29/1997"]])}</div>
+        <p class="hint-text">Daily data, so there is no countdown to bar close and no intraday session breaks.</p>`,
+      Appearance: `<div class="form-grid">${chk("vGrid", "Vertical grid lines")}${chk("hGrid", "Horizontal grid lines")}
+        ${num("fontSize", "Scales text size", 8, 20)}
+        ${sel("crosshair", "Crosshair", [["normal", "Free"], ["magnet", "Snap to bars"], ["hidden", "Hidden"]])}
+        ${chk("watermark", "Watermark (symbol name)")}
+        ${sel("navButtons", "Navigation buttons", [["hover", "Visible on mouse over"], ["always", "Always visible"], ["never", "Hidden"]])}
+        ${sel("paneButtons", "Pane buttons", [["hover", "Visible on mouse over"], ["always", "Always visible"], ["never", "Hidden"]])}
+        ${num("marginTop", "Top margin (%)", 0, 60)}${num("marginBottom", "Bottom margin (%)", 0, 60)}${num("rightMargin", "Right margin (bars)", 0, 60)}</div>`,
+      General: `<div class="form-grid">
+        <label class="field">Bars to load per chart<input id="sBars" type="number" min="200" max="20000" step="100" value="${s.bars}"></label>
+        <label class="field">Volume on the price chart<select id="sVol"><option value="1" ${s.volume ? "selected" : ""}>Show</option><option value="0" ${!s.volume ? "selected" : ""}>Hide</option></select></label>
+        <label class="field">After placing a drawing<select id="sStay"><option value="0" ${!s.stayInDrawMode ? "selected" : ""}>Back to cursor</option><option value="1" ${s.stayInDrawMode ? "selected" : ""}>Keep the tool</option></select></label>
+        <label class="field">Crosshair across charts<select id="sSync"><option value="0" ${!s.syncCrosshair ? "selected" : ""}>Independent</option><option value="1" ${s.syncCrosshair ? "selected" : ""}>Synced</option></select></label></div>
+        <p class="hint-text">Everything you save lives in the <code>data</code> folder next to the app, on your machine.</p>`,
+    };
+    const names = Object.keys(panes);
     const card = this.modal(
-      "Settings",
-      `<div class="form-grid">
-      <label class="field">Bars to load per chart<input id="sBars" type="number" min="200" max="20000" step="100" value="${s.bars}"></label>
-      <label class="field">Time axis<select id="sUtc"><option value="0" ${!s.utc ? "selected" : ""}>My local time</option><option value="1" ${s.utc ? "selected" : ""}>UTC</option></select></label>
-      <label class="field">Volume on the price chart<select id="sVol"><option value="1" ${s.volume ? "selected" : ""}>Show</option><option value="0" ${!s.volume ? "selected" : ""}>Hide</option></select></label>
-      <label class="field">After placing a drawing<select id="sStay"><option value="0" ${!s.stayInDrawMode ? "selected" : ""}>Back to cursor</option><option value="1" ${s.stayInDrawMode ? "selected" : ""}>Keep the tool</option></select></label>
-      <label class="field">Crosshair across charts<select id="sSync"><option value="0" ${!s.syncCrosshair ? "selected" : ""}>Independent</option><option value="1" ${s.syncCrosshair ? "selected" : ""}>Synced</option></select></label>
-    </div><p class="hint-text">Everything you save lives in the <code>data</code> folder next to the app, on your machine.</p>`,
-      { foot: '<button class="btn primary" data-ok>Save</button>' },
+      "Chart settings",
+      `<div class="set-tabs">${names.map((n, i) => `<button data-t="${i}" class="${i ? "" : "active"}">${n}</button>`).join("")}</div>${names.map((n, i) => `<div class="set-pane ${i ? "hidden" : ""}" data-p="${i}">${panes[n]}</div>`).join("")}`,
+      { foot: '<button class="btn" data-reset style="margin-right:auto">Defaults</button><button class="btn" data-close2>Cancel</button><button class="btn primary" data-ok>Ok</button>' },
     );
+    card.querySelector(".set-tabs").onclick = (e) => {
+      const t = e.target.dataset.t;
+      if (t == null) return;
+      card.querySelectorAll(".set-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.t === t));
+      card.querySelectorAll(".set-pane").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t));
+    };
+    card.querySelectorAll("[data-color]").forEach((el) => (el.oninput = () => (el.dataset.touched = "1")));
+    const done = () => {
+      this.closeModal();
+      this.applyChartClasses();
+      this.persist();
+      this.panes.forEach((p) => p.load({ keepView: true }));
+    };
+    card.querySelector("[data-close2]").onclick = () => this.closeModal();
+    card.querySelector("[data-reset]").onclick = () => {
+      s.chart = { ...CHART_DEFAULTS };
+      done();
+    };
     card.querySelector("[data-ok]").onclick = () => {
+      const next = { ...cs };
+      card.querySelectorAll("[data-ck]").forEach((el) => {
+        const k = el.dataset.ck;
+        if (el.type === "checkbox") next[k] = el.checked;
+        else if (el.type === "number") next[k] = Number(el.value);
+        else if ("color" in el.dataset) {
+          if (el.dataset.touched) next[k] = el.value;
+        } else next[k] = el.value;
+      });
+      s.chart = next;
       Object.assign(s, {
         bars: Math.max(200, Math.min(20000, Number($("#sBars").value) || 3000)),
         utc: $("#sUtc").value === "1",
@@ -1036,9 +1123,7 @@ class App {
         stayInDrawMode: $("#sStay").value === "1",
         syncCrosshair: $("#sSync").value === "1",
       });
-      this.closeModal();
-      this.persist();
-      this.panes.forEach((p) => p.load({ keepView: true }));
+      done();
     };
   }
 
