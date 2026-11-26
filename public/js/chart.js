@@ -1330,12 +1330,23 @@ export class ChartPane {
     } else if (kind === "Bar") Object.assign(o, { upColor: cs.bodyUp || up, downColor: cs.bodyDown || down });
     this.main.applyOptions(o);
     const hidden = cs.crosshair === "hidden";
+    const background =
+      cs.bgType === "gradient"
+        ? { type: LW.ColorType.VerticalGradient, topColor: cs.bgColor || css("--bg"), bottomColor: cs.bgColor2 || css("--panel") }
+        : { type: LW.ColorType.Solid, color: cs.bgColor || css("--bg") };
+    const gridColor = cs.gridColor || css("--grid"),
+      crossColor = cs.crosshairColor || "#758696",
+      lineColor = cs.scaleLineColor || css("--border");
     this.chart.applyOptions({
-      layout: { fontSize: cs.fontSize },
-      grid: { vertLines: { visible: cs.vGrid }, horzLines: { visible: cs.hGrid } },
-      crosshair: { mode: cs.crosshair === "magnet" ? LW.CrosshairMode.Magnet : LW.CrosshairMode.Normal, vertLine: { visible: !hidden }, horzLine: { visible: !hidden } },
-      rightPriceScale: { scaleMargins: { top: cs.marginTop / 100, bottom: cs.marginBottom / 100 } },
-      timeScale: { rightOffset: cs.rightMargin },
+      layout: { fontSize: cs.fontSize, background, textColor: cs.textColor || css("--text") },
+      grid: { vertLines: { visible: cs.vGrid, color: gridColor }, horzLines: { visible: cs.hGrid, color: gridColor } },
+      crosshair: {
+        mode: cs.crosshair === "magnet" ? LW.CrosshairMode.Magnet : LW.CrosshairMode.Normal,
+        vertLine: { visible: !hidden, color: crossColor, labelBackgroundColor: crossColor },
+        horzLine: { visible: !hidden, color: crossColor, labelBackgroundColor: crossColor },
+      },
+      rightPriceScale: { scaleMargins: { top: cs.marginTop / 100, bottom: cs.marginBottom / 100 }, borderColor: lineColor },
+      timeScale: { rightOffset: cs.rightMargin, borderColor: lineColor },
       localization: { dateFormat: cs.dateFormat },
     });
     this.wm?.detach();

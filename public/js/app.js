@@ -26,6 +26,7 @@ const CHART_DEFAULTS = {
   // Appearance
   fontSize: 11, vGrid: true, hGrid: true, crosshair: "normal", watermark: false, navButtons: "hover", paneButtons: "hover",
   marginTop: 20, marginBottom: 10, rightMargin: 8,
+  bgType: "solid", bgColor: "", bgColor2: "", gridColor: "", crosshairColor: "", textColor: "", scaleLineColor: "",
 };
 const DEFAULT_WATCHLISTS = {
   Main: [
@@ -1070,7 +1071,11 @@ class App {
     const chk = (k, label) => `<label class="field chk"><input type="checkbox" data-ck="${k}" ${cs[k] ? "checked" : ""}> ${label}</label>`;
     const sel = (k, label, opts) => `<label class="field">${label}<select data-ck="${k}">${opts.map(([v, t]) => `<option value="${esc(String(v))}" ${String(cs[k]) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`;
     const num = (k, label, min, max) => `<label class="field">${label}<input type="number" data-ck="${k}" min="${min}" max="${max}" value="${cs[k]}"></label>`;
-    const col = (k, label, dflt) => `<label class="field">${label}<input type="color" data-ck="${k}" data-color value="${cs[k] || dflt}"></label>`;
+    const col = (k, label, dflt) => `<label class="field">${label}<input type="color" data-ck="${k}" data-color data-dflt="${dflt}" value="${cs[k] || dflt}"></label>`;
+    const themeVar = (n, fallback) => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+      return /^#[0-9a-f]{6}$/i.test(v) ? v : fallback;
+    };
     const UP = "#089981",
       DN = "#f23645";
     const panes = {
@@ -1083,7 +1088,10 @@ class App {
       Scales: `<div class="form-grid">${chk("lastLabel", "Symbol last price label")}${chk("hiLoLabels", "High and low price labels")}
         ${sel("dateFormat", "Date format", [["dd MMM 'yy", "29 Sep '97"], ["yyyy-MM-dd", "1997-09-29"], ["dd/MM/yyyy", "29/09/1997"], ["MM/dd/yyyy", "09/29/1997"]])}</div>
         <p class="hint-text">Daily data, so there is no countdown to bar close and no intraday session breaks.</p>`,
-      Appearance: `<div class="form-grid">${chk("vGrid", "Vertical grid lines")}${chk("hGrid", "Horizontal grid lines")}
+      Appearance: `<div class="form-grid">${sel("bgType", "Background", [["solid", "Solid"], ["gradient", "Gradient"]])}
+        ${col("bgColor", "Background colour (top)", themeVar("--bg", "#0d1218"))}${col("bgColor2", "Gradient colour (bottom)", themeVar("--panel", "#141b23"))}
+        ${col("gridColor", "Grid lines", "#222c38")}${col("crosshairColor", "Crosshair", "#8794a3")}${col("textColor", "Scales text", themeVar("--text", "#e3e9ef"))}${col("scaleLineColor", "Scales lines", "#222c38")}
+        ${chk("vGrid", "Vertical grid lines")}${chk("hGrid", "Horizontal grid lines")}
         ${num("fontSize", "Scales text size", 8, 20)}
         ${sel("crosshair", "Crosshair", [["normal", "Free"], ["magnet", "Snap to bars"], ["hidden", "Hidden"]])}
         ${chk("watermark", "Watermark (symbol name)")}
@@ -1101,7 +1109,7 @@ class App {
     const card = this.modal(
       "Chart settings",
       `<div class="set-tabs">${names.map((n, i) => `<button data-t="${i}" class="${i ? "" : "active"}">${n}</button>`).join("")}</div>${names.map((n, i) => `<div class="set-pane ${i ? "hidden" : ""}" data-p="${i}">${panes[n]}</div>`).join("")}`,
-      { foot: '<button class="btn" data-reset style="margin-right:auto">Defaults</button><button class="btn" data-close2>Cancel</button><button class="btn primary" data-ok>Ok</button>' },
+      { foot: '<select class="in" id="setTpl" title="Chart settings templates" style="margin-right:8px"></select><button class="btn" data-reset style="margin-right:auto">Defaults</button><button class="btn" data-close2>Cancel</button><button class="btn primary" data-ok>Ok</button>' },
     );
     card.querySelector(".set-tabs").onclick = (e) => {
       const t = e.target.dataset.t;
@@ -1121,7 +1129,8 @@ class App {
       s.chart = { ...CHART_DEFAULTS };
       done();
     };
-    card.querySelector("[data-ok]").onclick = () => {
+    // a template is a named copy of every chart setting; picking one fills the form (Ok applies it)
+    const gather = () => {
       const next = { ...cs };
       card.querySelectorAll("[data-ck]").forEach((el) => {
         const k = el.dataset.ck;
@@ -1131,6 +1140,39 @@ class App {
           if (el.dataset.touched) next[k] = el.value;
         } else next[k] = el.value;
       });
+      return next;
+    };
+    const fill = (obj) => {
+      card.querySelectorAll("[data-ck]").forEach((el) => {
+        const v = obj[el.dataset.ck];
+        if (el.type === "checkbox") el.checked = !!v;
+        else if ("color" in el.dataset) {
+          el.value = v || el.dataset.dflt;
+          el.dataset.touched = v ? "1" : "";
+        } else if (v !== undefined) el.value = v;
+      });
+    };
+    const tpls = (this.state.chartTemplates ||= {});
+    const tplSel = card.querySelector("#setTpl");
+    const drawTpl = () => {
+      tplSel.innerHTML = `<option value="">Template…</option>${Object.keys(tpls).map((n) => `<option value="t:${esc(n)}">${esc(n)}</option>`).join("")}<option value="__save">Save current as…</option><option value="__del">Delete a template…</option>`;
+    };
+    drawTpl();
+    tplSel.onchange = () => {
+      const v = tplSel.value;
+      if (v === "__save") {
+        const name = (prompt("Name for this set of chart settings:", "") || "").trim();
+        if (name) tpls[name] = gather();
+        this.persist();
+      } else if (v === "__del") {
+        const name = (prompt(`Delete which template? (${Object.keys(tpls).join(", ") || "none saved"})`, "") || "").trim();
+        if (name in tpls) delete tpls[name];
+        this.persist();
+      } else if (v.startsWith("t:")) fill({ ...CHART_DEFAULTS, ...tpls[v.slice(2)] });
+      drawTpl();
+    };
+    card.querySelector("[data-ok]").onclick = () => {
+      const next = gather();
       s.chart = next;
       Object.assign(s, {
         bars: Math.max(200, Math.min(20000, Number($("#sBars").value) || 3000)),
