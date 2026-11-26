@@ -231,6 +231,7 @@ export function initPanels(app) {
       .querySelectorAll("#sideTabs button")
       .forEach((b) => b.classList.toggle("active", b.dataset.tab === t));
     renderSide();
+    updateSummary();
   }
   function showBottom(t, toggle = false) {
     if (
@@ -252,6 +253,9 @@ export function initPanels(app) {
     ({
       watchlist: renderWatchlist,
       shares: renderShares,
+      overview: renderOverview,
+      movers: renderMovers,
+      sectors: renderSectors,
       details: renderDetails,
       patterns: renderPatternsTab,
       alerts: renderAlerts,
@@ -525,6 +529,163 @@ export function initPanels(app) {
     box.innerHTML = rows
       .map((r) => `<div class="wl-row sh-row ${r.symbol === cur ? "current" : ""}" data-sym="${esc(r.symbol)}" style="grid-template-columns:${tpl}" title="${esc([r.name, r.sector, r.category && `Category ${r.category}`].filter(Boolean).join(" · "))}"><span class="sh-name"><button class="star ${mine.has(r.symbol) ? "on" : ""}" title="${mine.has(r.symbol) ? "Remove from" : "Add to"} Favorites">${mine.has(r.symbol) ? "★" : "☆"}</button><span class="sym ${r.changePct >= 0 ? "up" : "down"}">${esc(r.ticker)}</span></span>${cols.map((c) => cell[c[0]](r)).join("")}</div>`)
       .join("") || '<div class="pad hint-text">No share matches.</div>';
+  }
+
+  // ======================= MARKET OVERVIEW, MARKET MOVERS, SECTORS =======================
+  // Built from your own day-end files: the index candles and the share snapshot. Values are in BDT; "cr" is crore (10 million).
+  const idxCache = {};
+  async function indexBars(sym) {
+    const hit = idxCache[sym];
+    if (hit && Date.now() - hit.t < 180000) return hit.bars;
+    const r = await api.candles(sym, "1D", 3000);
+    idxCache[sym] = { t: Date.now(), bars: r.candles || [] };
+    return idxCache[sym].bars;
+  }
+  async function loadShares() {
+    if (!shareRows) shareRows = await api.dseShares();
+    return shareRows;
+  }
+  const crore = (v) => `${(v / 1e7).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cr`;
+  const dirOf = (v) => (v >= 0 ? "up" : "down");
+  const arrowOf = (v) => (v >= 0 ? "▲" : "▼");
+
+  // The strip under the panel title: how the DSEX moved, and the value traded across all shares.
+  let summaryAt = 0;
+  async function updateSummary() {
+    const el = $("#sideSummary");
+    if (!el || Date.now() - summaryAt < 20000) return;
+    summaryAt = Date.now();
+    try {
+      const [bars, rows] = await Promise.all([indexBars("DSE:DSEX"), loadShares()]);
+      const last = bars.at(-1),
+        prev = bars.at(-2);
+      if (!last || !prev) return;
+      const chg = last.close - prev.close,
+        pct = (chg / prev.close) * 100;
+      const value = rows.reduce((s, r) => s + (r.price || 0) * (r.volume || 0), 0);
+      el.innerHTML = `<b class="${dirOf(chg)}">${arrowOf(chg)} ${chg >= 0 ? "+" : ""}${chg.toFixed(2)} (${pct.toFixed(2)}%)</b><span title="Value traded: price times volume, summed over every share">${crore(value)}</span>`;
+    } catch {
+      /* the strip just stays empty */
+    }
+  }
+
+  let overviewIndex = "DSE:DSEX";
+  async function renderOverview() {
+    const names = [["DSE:DSEX", "DSEX"], ["DSE:DS30", "DS30"]];
+    side.innerHTML = '<div class="pad hint-text">Loading…</div>';
+    let bars;
+    try {
+      bars = await indexBars(overviewIndex);
+    } catch (err) {
+      side.innerHTML = `<div class="pad hint-text">${esc(err.message)}</div>`;
+      return;
+    }
+    if (sideTab !== "overview") return;
+    const last = bars.at(-1),
+      prev = bars.at(-2);
+    if (!last) {
+      side.innerHTML = '<div class="pad hint-text">No index data.</div>';
+      return;
+    }
+    const chg = prev ? last.close - prev.close : 0,
+      pct = prev ? (chg / prev.close) * 100 : 0;
+    const move = ([label, days]) => {
+      const cut = last.time - days * 86400;
+      let i = bars.findIndex((b) => b.time >= cut);
+      if (i < 0) i = 0;
+      const seg = bars.slice(i),
+        lo = Math.min(...seg.map((b) => b.low)),
+        hi = Math.max(...seg.map((b) => b.high));
+      const ref = i > 0 ? bars[i - 1].close : seg[0].open,
+        p = ((last.close / ref) - 1) * 100,
+        at = hi > lo ? ((last.close - lo) / (hi - lo)) * 100 : 50;
+      return `<div class="ov-row"><span>${label}</span><b class="${dirOf(p)}">${p >= 0 ? "+" : ""}${p.toFixed(2)}%</b></div>
+        <div class="ov-range"><span>${fmtPrice(lo)}</span><i style="--p:${at.toFixed(1)}%"></i><span>${fmtPrice(hi)}</span></div>`;
+    };
+    const row = (k, v) => `<div class="ov-row"><span>${k}</span><b>${v}</b></div>`;
+    const date = new Date(last.time * 1000).toISOString().slice(0, 10);
+    side.innerHTML = `<div class="ov-tabs">${names.map(([s, n]) => `<button data-i="${s}" class="${s === overviewIndex ? "on" : ""}">${n}</button>`).join("")}</div>
+      <div class="ov-head"><div class="ov-px">${fmtPrice(last.close)}</div><div class="${dirOf(chg)}">${arrowOf(chg)} ${chg >= 0 ? "+" : ""}${chg.toFixed(2)} (${pct.toFixed(2)}%)</div><small>${date} · day-end</small></div>
+      <div class="dt-sec">Movement</div>${[["Weekly", 7], ["1 month", 31], ["6 month", 183], ["Yearly", 365]].map(move).join("")}
+      <div class="dt-sec">Day</div>${row("Open", fmtPrice(last.open))}${row("High", fmtPrice(last.high))}${row("Low", fmtPrice(last.low))}${row("Previous close", prev ? fmtPrice(prev.close) : "—")}
+      <div class="pad"><button class="btn small" data-open>Open ${esc(ticker(overviewIndex))} chart</button></div>`;
+    side.onclick = (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      if (b.dataset.i) {
+        overviewIndex = b.dataset.i;
+        renderOverview();
+      } else if (b.dataset.open) app.setSymbol(overviewIndex);
+    };
+  }
+
+  function moverRows(list, metric) {
+    return list.map((r) => `<div class="wl-row mv-row" data-sym="${esc(r.symbol)}" title="${esc(r.name || "")}"><span class="sym ${dirOf(r.changePct)}">${esc(r.ticker)}</span><span class="px">${fmtPrice(r.price)}</span><span class="chg ${dirOf(r.changePct)}">${fmtPct(r.changePct)}</span><span class="vol">${metric(r)}</span></div>`).join("") || '<div class="pad hint-text">None.</div>';
+  }
+  async function renderMovers() {
+    side.innerHTML = '<div class="pad hint-text">Loading…</div>';
+    let rows;
+    try {
+      rows = await loadShares();
+    } catch (err) {
+      side.innerHTML = `<div class="pad hint-text">${esc(err.message)}</div>`;
+      return;
+    }
+    if (sideTab !== "movers") return;
+    const top = (arr, f, n = 10) => [...arr].sort((a, b) => f(b) - f(a)).slice(0, n);
+    const value = (r) => (r.price || 0) * (r.volume || 0);
+    const sections = [
+      ["Top gainers", moverRows(top(rows.filter((r) => r.changePct > 0), (r) => r.changePct), (r) => COMPACT.format(r.volume))],
+      ["Top losers", moverRows(top(rows.filter((r) => r.changePct < 0), (r) => -r.changePct), (r) => COMPACT.format(r.volume))],
+      ["Top value", moverRows(top(rows, value), (r) => crore(value(r)))],
+      ["Top volume", moverRows(top(rows, (r) => r.volume || 0), (r) => COMPACT.format(r.volume))],
+    ];
+    side.innerHTML = `<div class="mv-note">Last close ${esc(rows[0]?.date || "")} · ${rows.length} shares</div>${sections.map(([t, html]) => `<details class="mv-sec" open><summary>${t}</summary>${html}</details>`).join("")}`;
+    side.onclick = (e) => {
+      const row = e.target.closest(".mv-row");
+      if (row) app.setSymbol(row.dataset.sym);
+    };
+  }
+
+  async function renderSectors() {
+    side.innerHTML = '<div class="pad hint-text">Loading…</div>';
+    let rows;
+    try {
+      rows = await loadShares();
+    } catch (err) {
+      side.innerHTML = `<div class="pad hint-text">${esc(err.message)}</div>`;
+      return;
+    }
+    if (sideTab !== "sectors") return;
+    const groups = new Map();
+    for (const r of rows) {
+      const k = r.sector || "Other";
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
+    }
+    const idx = [];
+    for (const [sym, name] of [["DSE:DSEX", "DSEX"], ["DSE:DS30", "DS30"]]) {
+      try {
+        const b = await indexBars(sym),
+          l = b.at(-1),
+          p = b.at(-2);
+        if (l && p) idx.push({ symbol: sym, ticker: name, price: l.close, changePct: ((l.close / p.close) - 1) * 100, volume: l.volume, name });
+      } catch {
+        /* an index that is not there is just left out */
+      }
+    }
+    const head = (title, list) => {
+      const avg = list.reduce((s, r) => s + (r.changePct || 0), 0) / (list.length || 1);
+      return `<summary><span>${esc(title)}</span><small>${list.length}</small><b class="${dirOf(avg)}">${fmtPct(avg)}</b></summary>`;
+    };
+    const body = (list) => moverRows([...list].sort((a, b) => a.ticker.localeCompare(b.ticker)), (r) => COMPACT.format(r.volume));
+    side.innerHTML =
+      (idx.length ? `<details class="mv-sec" open>${head("Indices", idx)}${body(idx)}</details>` : "") +
+      [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, list]) => `<details class="mv-sec">${head(k, list)}${body(list)}</details>`).join("");
+    side.onclick = (e) => {
+      const row = e.target.closest(".mv-row");
+      if (row) app.setSymbol(row.dataset.sym);
+    };
   }
 
   // ======================= DETAILS =======================
