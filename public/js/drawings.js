@@ -2,7 +2,7 @@
 // { time (UTC seconds), price } so drawings stay put when you change timeframe.
 
 export const TOOLS = [
-  { id: "cursor", label: "Cursor", icon: '<path d="M5 3l14 7-6 2-2 6z"/>' },
+  { id: "cursor", label: "Cursor", icon: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>' },
   {
     id: "trend",
     label: "Trend line",

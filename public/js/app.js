@@ -482,7 +482,8 @@ class App {
       this.setTool("replay-pick");
       this.toast("Click the bar you want replay to start from.");
     };
-    $("#alertBtn").onclick = () => this.panels.openAlertDialog();
+    // with a line selected on the chart, Alert watches that line; otherwise it opens the alert dialog
+    $("#alertBtn").onclick = () => (this.active?.drawings.selected ? this.alertOnSelectedDrawing() : this.panels.openAlertDialog());
     $("#adjBtn").onclick = () => {
       this.active.cfg.adjusted = !this.active.cfg.adjusted;
       this.active.load({ keepView: true });
@@ -626,9 +627,7 @@ class App {
       '<button data-act="stay" title="Stay in drawing mode: keep the tool after placing a drawing"><svg viewBox="0 0 24 24"><path d="M4 20l4-1L19 8l-3-3L5 16zM14 7l3 3"/></svg></button>' +
       '<button data-act="lock" title="Lock drawings: stops them being selected or deleted"><svg viewBox="0 0 24 24"><path d="M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3"/></svg></button>' +
       '<button data-act="hide" title="Hide all drawings"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M4 20L20 4"/></svg></button>' +
-      '<hr><button data-act="alert"title="Alert when price crosses the selected line"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20h4"/></svg></button>' +
-      '<button data-act="delete" title="Delete selected drawing (Delete key)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>' +
-      '<button data-act="clear" title="Remove all drawings on this symbol"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></svg></button>' +
+      '<hr><button data-act="delete" title="Remove the selected drawing, or all drawings if none is selected"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>' +
       '<button data-act="collapse" class="dg-collapse" title="Hide the drawing toolbar"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
     for (const [act, flag] of [["magnet", "magnet"], ["lock", "lockDrawings"], ["hide", "hideDrawings"]])
       bar.querySelector(`[data-act="${act}"]`).classList.toggle("active", !!this[flag]);
@@ -668,11 +667,11 @@ class App {
         this.persist();
       }
       if (b.dataset.act === "collapse") this.setDrawbar(false);
-      if (b.dataset.act === "alert") this.alertOnSelectedDrawing();
-      if (b.dataset.act === "delete" && !this.active.deleteSelectedDrawing())
-        this.toast("Click a drawing first to select it.");
+      // the bin removes the selected drawing, or every drawing on this symbol when none is selected (as BullBD's does)
       if (
-        b.dataset.act === "clear" &&
+        b.dataset.act === "delete" &&
+        !this.active.deleteSelectedDrawing() &&
+        this.active.drawings.items.length &&
         confirm(`Remove every drawing on ${ticker(this.active.cfg.symbol)}?`)
       )
         this.active.clearDrawings();

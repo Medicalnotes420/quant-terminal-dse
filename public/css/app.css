@@ -1175,3 +1175,17 @@ body { font-family: Roboto, -apple-system, "Helvetica Neue", Helvetica, Arial, "
 .rangebar button:hover { color: var(--text); }
 .side { background: var(--bg); }
 .side-head { background: var(--bg); }
+
+/* left toolbar like BullBD's: full-width flat buttons, big thin icons, flyout arrows only on hover, blue active tool */
+.drawbar { width: 46px; padding-top: 4px; gap: 0; align-items: stretch; }
+.drawbar button, .dg { width: 46px; }
+.drawbar > button, .dg > button:first-child { height: 36px; border-radius: 0; color: var(--text); }
+.drawbar button svg { width: 26px; height: 26px; stroke-width: 1.2; }
+.drawbar button:hover { background: var(--hover); }
+.drawbar button.active { background: transparent; color: #2962ff; }
+.drawbar hr { width: auto; margin: 4px 8px; border: 0; border-top: 1px solid transparent; }
+.dg > button:first-child::after { opacity: 0; transition: opacity .1s; }
+.dg:hover > button:first-child::after { opacity: 1; }
+.drawbar .dg-fly button { width: 100%; }
+.drawbar .dg-fly button svg { width: 22px; height: 22px; }
+.drawbar .dg-collapse { align-self: center; width: 20px; height: 36px; }
